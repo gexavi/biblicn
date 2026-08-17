@@ -475,13 +475,23 @@ function renderBulkResults(container, data) {
 // --- Import CSV ---
 let parsedCsvBooks = [];
 
+function detectCsvDelimiter(headerLine) {
+  // Excel en français (et beaucoup de tableurs européens) exporte le CSV
+  // avec des points-virgules, la virgule étant déjà utilisée comme séparateur
+  // décimal. On compte les deux et on prend le plus fréquent sur l'en-tête.
+  const commaCount = (headerLine.match(/,/g) || []).length;
+  const semicolonCount = (headerLine.match(/;/g) || []).length;
+  return semicolonCount > commaCount ? ';' : ',';
+}
+
 function parseCsv(text) {
   const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim() !== '');
   if (!lines.length) return [];
-  const headers = splitCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+  const delimiter = detectCsvDelimiter(lines[0]);
+  const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim().toLowerCase());
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const cells = splitCsvLine(lines[i]);
+    const cells = splitCsvLine(lines[i], delimiter);
     const obj = {};
     headers.forEach((h, idx) => { obj[h] = (cells[idx] || '').trim(); });
     rows.push(obj);
@@ -489,7 +499,7 @@ function parseCsv(text) {
   return rows;
 }
 
-function splitCsvLine(line) {
+function splitCsvLine(line, delimiter) {
   const result = [];
   let cur = '';
   let inQuotes = false;
@@ -501,7 +511,7 @@ function splitCsvLine(line) {
       else { cur += c; }
     } else {
       if (c === '"') inQuotes = true;
-      else if (c === ',') { result.push(cur); cur = ''; }
+      else if (c === delimiter) { result.push(cur); cur = ''; }
       else cur += c;
     }
   }

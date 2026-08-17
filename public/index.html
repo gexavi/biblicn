@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ma Bibliothèque</title>
+<title>Bibliothèque ChickNours</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark">§</span>
-    <h1>Ma Bibliothèque</h1>
+    <h1>Bibliothèque ChickNours</h1>
   </div>
   <div class="stats" id="stats">
     <div class="stat"><strong id="statTotal">0</strong><span>livres</span></div>
@@ -208,6 +208,7 @@
         Colonnes attendues (première ligne = en-têtes) :
         <code>title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn</code><br>
         Seule la colonne <code>title</code> est obligatoire. <code>type</code> = roman, bd, manga, essai ou autre. <code>lu</code> = oui/non.
+        Séparateur virgule ou point-virgule accepté (détecté automatiquement — utile pour les exports Excel en français).
       </p>
       <button class="link-btn" id="downloadTemplateBtn" type="button">Télécharger un modèle CSV</button>
       <input type="file" id="csvFileInput" accept=".csv,text/csv" style="margin-top:12px; display:block;">

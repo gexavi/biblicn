@@ -67,7 +67,7 @@ npm start
 Le bouton **Import en masse** (en haut de l'écran) propose deux méthodes :
 
 - **Liste d'ISBN** : collez un ISBN par ligne (avec ou sans tirets). Chaque livre est recherché automatiquement comme pour l'ajout unitaire, avec un type, un rangement et un propriétaire par défaut appliqués à tous. Les ISBN introuvables sont listés à part, sans bloquer les autres.
-- **Fichier CSV** : importez un fichier avec les colonnes `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn` (première ligne = en-têtes, seule `title` est obligatoire ; `type` = `roman`, `bd`, `manga`, `essai` ou `autre` ; `lu` = `oui`/`non`). Un bouton **Télécharger un modèle CSV** dans la modale fournit un exemple prêt à remplir dans un tableur. Pratique pour ressaisir un catalogue existant (export Excel, Babelio, Goodreads reformaté, etc.) sans dépendre de la recherche par ISBN.
+- **Fichier CSV** : importez un fichier avec les colonnes `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn` (première ligne = en-têtes, seule `title` est obligatoire ; `type` = `roman`, `bd`, `manga`, `essai` ou `autre` ; `lu` = `oui`/`non`). Le séparateur (virgule ou point-virgule) est détecté automatiquement — utile pour les exports Excel en français, qui utilisent le point-virgule par défaut. Un bouton **Télécharger un modèle CSV** dans la modale fournit un exemple prêt à remplir dans un tableur. Pratique pour ressaisir un catalogue existant (export Excel, Babelio, Goodreads reformaté, etc.) sans dépendre de la recherche par ISBN.
 
 ## Interface
 
