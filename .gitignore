@@ -1,0 +1,19 @@
+# Dépendances (réinstallées via npm install / au build Docker)
+node_modules/
+package-lock.json
+
+# Données personnelles : base de données, couvertures téléchargées, exports CSV
+# -> ne doit JAMAIS être versionné (c'est VOTRE bibliothèque, pas du code)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

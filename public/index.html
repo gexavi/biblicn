@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma Bibliothèque</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+<div class="sticky-header">
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">§</span>
+    <h1>Ma Bibliothèque</h1>
+  </div>
+  <div class="stats" id="stats">
+    <div class="stat"><strong id="statTotal">0</strong><span>livres</span></div>
+    <div class="stat"><strong id="statLus">0</strong><span>lus</span></div>
+    <div class="stat"><strong id="statPretes">0</strong><span>prêtés</span></div>
+  </div>
+  <button class="btn btn-ghost btn-bordered" id="localizeCoversBtn" title="Télécharge et optimise en local les couvertures qui pointent encore vers une source externe">🖼️ Optimiser les couvertures</button>
+  <button class="btn btn-ghost btn-bordered" id="openBulkBtn">Import en masse</button>
+  <button class="btn btn-primary" id="openAddBtn">+ Ajouter un livre</button>
+</header>
+
+<div class="toolbar">
+  <input type="search" id="searchInput" placeholder="Rechercher un titre, un auteur, un ISBN…" class="search-input">
+  <select id="filterType" class="select">
+    <option value="">Tous les types</option>
+    <option value="roman">Roman</option>
+    <option value="bd">BD</option>
+    <option value="manga">Manga</option>
+    <option value="essai">Essai</option>
+    <option value="autre">Autre</option>
+  </select>
+  <select id="filterLu" class="select">
+    <option value="">Lu / non lu</option>
+    <option value="1">Lus</option>
+    <option value="0">Non lus</option>
+  </select>
+  <select id="filterGenre" class="select">
+    <option value="">Tous les genres</option>
+  </select>
+  <select id="filterPublisher" class="select">
+    <option value="">Tous les éditeurs</option>
+  </select>
+  <select id="filterOwner" class="select">
+    <option value="">Appartient à (tous)</option>
+  </select>
+  <select id="sortBy" class="select">
+    <option value="recent">Récemment ajoutés</option>
+    <option value="title">Titre (A-Z)</option>
+    <option value="author">Auteur (A-Z)</option>
+    <option value="note">Meilleure note</option>
+  </select>
+  <div class="view-toggle" role="group" aria-label="Mode d'affichage">
+    <button class="view-btn active" id="viewGridBtn" type="button" aria-label="Vue grille" title="Vue grille">▦</button>
+    <button class="view-btn" id="viewListBtn" type="button" aria-label="Vue liste" title="Vue liste">☰</button>
+  </div>
+</div>
+</div>
+
+<main>
+  <div id="shelf" class="shelf"></div>
+  <p id="emptyState" class="empty-state" hidden>
+    Votre étagère est vide. <button class="link-btn" id="emptyAddBtn">Ajoutez votre premier livre</button>.
+  </p>
+</main>
+
+<!-- Modale ajout / édition -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Ajouter un livre</h2>
+      <button class="icon-btn" id="closeModalBtn" aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="isbn-row">
+      <input type="text" id="isbnInput" placeholder="Scanner ou saisir un ISBN" class="isbn-input" inputmode="numeric">
+      <button class="btn btn-bordered" id="scanBarcodeBtn" type="button" title="Scanner un code-barres">📷</button>
+      <button class="btn btn-secondary" id="isbnLookupBtn">Rechercher</button>
+    </div>
+    <p class="isbn-status" id="isbnStatus"></p>
+
+    <div class="modal-cover-preview" id="modalCoverPreview" hidden>
+      <img id="modalCoverImg" src="" alt="Couverture">
+      <span id="modalCoverLabel" style="font-size:12px;color:var(--ink-soft);"></span>
+    </div>
+
+    <form id="bookForm">
+      <input type="hidden" id="bookId">
+      <div class="field-grid">
+        <label class="field">
+          <span>Nom du livre *</span>
+          <input type="text" id="fieldTitle" required>
+        </label>
+        <label class="field">
+          <span>Auteur</span>
+          <input type="text" id="fieldAuthor">
+        </label>
+        <label class="field">
+          <span>Type</span>
+          <select id="fieldType">
+            <option value="roman">Roman</option>
+            <option value="bd">BD</option>
+            <option value="manga">Manga</option>
+            <option value="essai">Essai</option>
+            <option value="autre">Autre</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Genre</span>
+          <input type="text" id="fieldGenre" placeholder="Fantasy, policier…">
+        </label>
+        <label class="field">
+          <span>Éditeur</span>
+          <input type="text" id="fieldPublisher" placeholder="Gallimard, Bragelonne…">
+        </label>
+        <label class="field">
+          <span>Note /20</span>
+          <input type="number" id="fieldNote" min="0" max="20" step="1">
+        </label>
+        <label class="field field-checkbox">
+          <input type="checkbox" id="fieldLu">
+          <span>Lu</span>
+          <span id="readDateWrap" class="read-date-wrap" hidden>
+            le <input type="date" id="fieldReadDate" class="read-date-input">
+          </span>
+        </label>
+        <label class="field">
+          <span>Rangé dans</span>
+          <input type="text" id="fieldLocation" placeholder="Étagère salon, carton 3…">
+        </label>
+        <label class="field">
+          <span>Prêté à</span>
+          <input type="text" id="fieldLentTo" placeholder="Nom de la personne">
+        </label>
+        <label class="field">
+          <span>Appartient à</span>
+          <input type="text" id="fieldOwner" placeholder="Nom de la personne">
+        </label>
+        <label class="field field-full">
+          <span>URL de couverture (optionnel)</span>
+          <input type="text" id="fieldCover" placeholder="https://... — utile si la recherche auto n'en trouve pas">
+        </label>
+      </div>
+      <input type="hidden" id="fieldIsbn">
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger" id="deleteBtn" hidden>Supprimer</button>
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-ghost" id="cancelBtn">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale import en masse -->
+<div class="modal-backdrop" id="bulkModalBackdrop" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Import en masse</h2>
+      <button class="icon-btn" id="closeBulkModalBtn" aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="isbn">Liste d'ISBN</button>
+      <button class="tab-btn" data-tab="csv">Fichier CSV</button>
+    </div>
+
+    <div class="tab-panel" id="tabIsbn">
+      <p class="tab-help">Collez un ISBN par ligne. Chaque livre sera recherché automatiquement (titre, auteur, genre).</p>
+      <textarea id="bulkIsbnText" rows="8" placeholder="9782070368228&#10;9782070456334&#10;978-2-07-036822-8"></textarea>
+      <div class="field-grid" style="margin-top:12px;">
+        <label class="field">
+          <span>Type par défaut</span>
+          <select id="bulkDefaultType">
+            <option value="roman">Roman</option>
+            <option value="bd">BD</option>
+            <option value="manga">Manga</option>
+            <option value="essai">Essai</option>
+            <option value="autre">Autre</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Rangé dans (optionnel)</span>
+          <input type="text" id="bulkDefaultLocation" placeholder="Étagère salon…">
+        </label>
+        <label class="field">
+          <span>Appartient à (optionnel)</span>
+          <input type="text" id="bulkDefaultOwner" placeholder="Nom de la personne">
+        </label>
+      </div>
+      <button class="btn btn-primary" id="runBulkIsbnBtn" style="margin-top:14px;">Rechercher et ajouter</button>
+      <div id="bulkIsbnProgress" class="bulk-progress" hidden></div>
+      <div id="bulkIsbnResults" class="bulk-results"></div>
+    </div>
+
+    <div class="tab-panel" id="tabCsv" hidden>
+      <p class="tab-help">
+        Colonnes attendues (première ligne = en-têtes) :
+        <code>title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn</code><br>
+        Seule la colonne <code>title</code> est obligatoire. <code>type</code> = roman, bd, manga, essai ou autre. <code>lu</code> = oui/non.
+      </p>
+      <button class="link-btn" id="downloadTemplateBtn" type="button">Télécharger un modèle CSV</button>
+      <input type="file" id="csvFileInput" accept=".csv,text/csv" style="margin-top:12px; display:block;">
+      <div id="csvPreview" class="csv-preview"></div>
+      <button class="btn btn-primary" id="runBulkCsvBtn" style="margin-top:14px;" disabled>Importer ces livres</button>
+      <div id="bulkCsvResults" class="bulk-results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay de scan de code-barres -->
+<div class="scanner-overlay" id="scannerOverlay" hidden>
+  <div class="scanner-head">
+    <h2>Scanner un code-barres</h2>
+    <button class="icon-btn" id="closeScannerBtn" aria-label="Fermer">✕</button>
+  </div>
+  <p class="scanner-hint">Visez le code-barres ISBN au dos du livre (le plus souvent EAN-13, sous le prix).</p>
+  <div id="barcodeReaderRegion"></div>
+  <p class="scanner-status" id="scannerStatus"></p>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
