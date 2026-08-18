@@ -18,10 +18,15 @@
     <span class="brand-mark">§</span>
     <h1>Bibliothèque ChickNours</h1>
   </div>
+  <div class="status-toggle" role="group" aria-label="Bibliothèque ou liste de souhaits">
+    <button class="status-btn active" id="viewLibraryBtn" type="button">📚 Ma bibliothèque</button>
+    <button class="status-btn" id="viewWishlistBtn" type="button">🎁 Liste de souhaits</button>
+  </div>
   <div class="stats" id="stats">
     <div class="stat"><strong id="statTotal">0</strong><span>livres</span></div>
     <div class="stat"><strong id="statLus">0</strong><span>lus</span></div>
     <div class="stat"><strong id="statPretes">0</strong><span>prêtés</span></div>
+    <div class="stat"><strong id="statSouhaites">0</strong><span>souhaités</span></div>
   </div>
   <button class="btn btn-ghost btn-bordered" id="localizeCoversBtn" title="Télécharge et optimise en local les couvertures qui pointent encore vers une source externe">🖼️ Optimiser les couvertures</button>
   <button class="btn btn-ghost btn-bordered" id="openBulkBtn">Import en masse</button>
@@ -150,10 +155,12 @@
         </label>
       </div>
       <input type="hidden" id="fieldIsbn">
+      <input type="hidden" id="fieldStatus" value="possede">
 
       <div class="modal-actions">
         <button type="button" class="btn btn-danger" id="deleteBtn" hidden>Supprimer</button>
         <div class="modal-actions-right">
+          <button type="button" class="btn btn-secondary" id="markAcquiredBtn" hidden>🎁→📚 Marquer comme acquis</button>
           <button type="button" class="btn btn-ghost" id="cancelBtn">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>

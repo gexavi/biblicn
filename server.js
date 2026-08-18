@@ -37,8 +37,8 @@ db.exec(`
   )
 `);
 
-// Migration : ajoute les colonnes read_date, publisher, owner si elles
-// n'existent pas encore (bases créées avant ces fonctionnalités).
+// Migration : ajoute les colonnes read_date, publisher, owner, status si
+// elles n'existent pas encore (bases créées avant ces fonctionnalités).
 const existingColumns = db.prepare("PRAGMA table_info(books)").all().map(c => c.name);
 if (!existingColumns.includes('read_date')) {
   db.exec('ALTER TABLE books ADD COLUMN read_date TEXT');
@@ -48,6 +48,12 @@ if (!existingColumns.includes('publisher')) {
 }
 if (!existingColumns.includes('owner')) {
   db.exec('ALTER TABLE books ADD COLUMN owner TEXT');
+}
+if (!existingColumns.includes('status')) {
+  // 'possede' = dans la bibliothèque, 'souhaite' = liste de souhaits.
+  // Tous les livres déjà en base sont considérés possédés par défaut.
+  db.exec("ALTER TABLE books ADD COLUMN status TEXT DEFAULT 'possede'");
+  db.exec("UPDATE books SET status = 'possede' WHERE status IS NULL");
 }
 
 app.use(express.json());
@@ -412,9 +418,14 @@ app.get('/api/isbn/:isbn', async (req, res) => {
 
 // ---------- CRUD Livres ----------
 app.get('/api/books', (req, res) => {
-  const { q, type, genre, lu, sort, publisher, owner } = req.query;
+  const { q, type, genre, lu, sort, publisher, owner, status } = req.query;
   let query = 'SELECT * FROM books WHERE 1=1';
   const params = [];
+
+  // Par défaut on ne montre que les livres possédés (pas la liste de souhaits),
+  // pour ne jamais mélanger les deux vues par accident.
+  query += ' AND status = ?';
+  params.push(status === 'souhaite' ? 'souhaite' : 'possede');
 
   if (q) {
     query += ' AND (title LIKE ? OR author LIKE ? OR isbn LIKE ?)';
@@ -463,8 +474,8 @@ app.post('/api/books', async (req, res) => {
   const b = req.body;
   if (!b.title) return res.status(400).json({ error: 'Le titre est requis' });
   const stmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
   `);
   const info = stmt.run({
     isbn: b.isbn || null,
@@ -479,7 +490,8 @@ app.post('/api/books', async (req, res) => {
     cover_url: b.cover_url || null,
     read_date: b.read_date || null,
     publisher: b.publisher || '',
-    owner: b.owner || ''
+    owner: b.owner || '',
+    status: b.status === 'souhaite' ? 'souhaite' : 'possede'
   });
   const bookId = info.lastInsertRowid;
 
@@ -513,7 +525,7 @@ app.put('/api/books/:id', async (req, res) => {
   db.prepare(`
     UPDATE books SET isbn=@isbn, title=@title, author=@author, type=@type, genre=@genre,
       lu=@lu, note=@note, location=@location, lent_to=@lent_to, cover_url=@cover_url, read_date=@read_date,
-      publisher=@publisher, owner=@owner
+      publisher=@publisher, owner=@owner, status=@status
     WHERE id=@id
   `).run({
     id: req.params.id,
@@ -529,7 +541,8 @@ app.put('/api/books/:id', async (req, res) => {
     cover_url: coverToStore,
     read_date: b.read_date || null,
     publisher: b.publisher || '',
-    owner: b.owner || ''
+    owner: b.owner || '',
+    status: b.status === 'souhaite' ? 'souhaite' : 'possede'
   });
   const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
   res.json(updated);
@@ -545,7 +558,8 @@ app.delete('/api/books/:id', (req, res) => {
 // Liste des genres distincts (les livres peuvent avoir plusieurs genres
 // séparés par des virgules, ex. "Fantasy, Aventure" -> on les éclate ici).
 app.get('/api/genres', (req, res) => {
-  const rows = db.prepare("SELECT genre FROM books WHERE genre IS NOT NULL AND genre != ''").all();
+  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const rows = db.prepare("SELECT genre FROM books WHERE status = ? AND genre IS NOT NULL AND genre != ''").all(status);
   const set = new Set();
   for (const row of rows) {
     row.genre.split(',').map(g => g.trim()).filter(Boolean).forEach(g => set.add(g));
@@ -555,14 +569,16 @@ app.get('/api/genres', (req, res) => {
 
 // Liste des éditeurs distincts.
 app.get('/api/publishers', (req, res) => {
-  const rows = db.prepare("SELECT DISTINCT publisher FROM books WHERE publisher IS NOT NULL AND publisher != '' ORDER BY publisher COLLATE NOCASE").all();
+  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const rows = db.prepare("SELECT DISTINCT publisher FROM books WHERE status = ? AND publisher IS NOT NULL AND publisher != '' ORDER BY publisher COLLATE NOCASE").all(status);
   res.json(rows.map(r => r.publisher));
 });
 
 // Liste des propriétaires distincts (comme le genre, plusieurs noms peuvent
 // être séparés par des virgules pour un livre partagé entre plusieurs personnes).
 app.get('/api/owners', (req, res) => {
-  const rows = db.prepare("SELECT owner FROM books WHERE owner IS NOT NULL AND owner != ''").all();
+  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const rows = db.prepare("SELECT owner FROM books WHERE status = ? AND owner IS NOT NULL AND owner != ''").all(status);
   const set = new Set();
   for (const row of rows) {
     row.owner.split(',').map(o => o.trim()).filter(Boolean).forEach(o => set.add(o));
@@ -577,10 +593,11 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
   const isbns = Array.isArray(req.body.isbns) ? req.body.isbns : [];
   const results = [];
   const insertStmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
   `);
   const defaults = req.body.defaults || {};
+  const status = defaults.status === 'souhaite' ? 'souhaite' : 'possede';
 
   for (const raw of isbns) {
     const isbn = String(raw).replace(/[^0-9Xx]/g, '');
@@ -604,7 +621,8 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
         cover_url: data.cover_url || null,
         read_date: null,
         publisher: data.publisher || '',
-        owner: defaults.owner || ''
+        owner: defaults.owner || '',
+        status
       });
       const bookId = info.lastInsertRowid;
       if (data.cover_url) {
@@ -639,8 +657,8 @@ function normalizeType(raw) {
 app.post('/api/books/bulk', async (req, res) => {
   const books = Array.isArray(req.body.books) ? req.body.books : [];
   const insertStmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
   `);
   let added = 0;
   const errors = [];
@@ -665,7 +683,8 @@ app.post('/api/books/bulk', async (req, res) => {
         cover_url: b.cover_url || null,
         read_date: b.read_date || null,
         publisher: b.publisher || '',
-        owner: b.owner || ''
+        owner: b.owner || '',
+        status: String(b.status || '').toLowerCase() === 'souhaite' ? 'souhaite' : 'possede'
       });
       added++;
       if (b.cover_url) insertedIdsWithCover.push({ id: info.lastInsertRowid, cover_url: b.cover_url });
@@ -708,10 +727,11 @@ app.post('/api/covers/localize-all', async (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
-  const total = db.prepare('SELECT COUNT(*) c FROM books').get().c;
-  const lus = db.prepare('SELECT COUNT(*) c FROM books WHERE lu = 1').get().c;
-  const pretes = db.prepare("SELECT COUNT(*) c FROM books WHERE lent_to IS NOT NULL AND lent_to != ''").get().c;
-  res.json({ total, lus, pretes });
+  const total = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'possede'").get().c;
+  const lus = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'possede' AND lu = 1").get().c;
+  const pretes = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'possede' AND lent_to IS NOT NULL AND lent_to != ''").get().c;
+  const souhaites = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'souhaite'").get().c;
+  res.json({ total, lus, pretes, souhaites });
 });
 
 app.listen(PORT, () => {

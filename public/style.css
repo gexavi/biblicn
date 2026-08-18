@@ -84,6 +84,28 @@ body {
 .stat strong { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: #F5F1E6; }
 .stat span { font-size: 11px; color: #A9BBD1; text-transform: uppercase; letter-spacing: .06em; }
 
+.status-toggle {
+  display: flex;
+  border: 1px solid rgba(245,241,230,.25);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.status-btn {
+  background: transparent;
+  border: none;
+  color: #C7D4E3;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-btn + .status-btn { border-left: 1px solid rgba(245,241,230,.25); }
+.status-btn.active { background: var(--brass); color: #241B04; }
+.status-btn:hover:not(.active) { color: #F5F1E6; }
+
 /* ---------- Buttons ---------- */
 .btn {
   font-family: var(--font-body);
@@ -276,6 +298,20 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   gap: 14px;
 }
 .book-note { font-family: var(--font-mono); color: var(--brass); font-weight: 500; }
+
+.quick-acquire-btn {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--forest);
+  color: var(--forest);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.quick-acquire-btn:hover { background: var(--forest); color: #0E1712; }
 .book-status { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .book-status.lu { color: var(--forest); font-weight: 600; }
 .book-read-date { color: var(--ink-soft); font-weight: 400; font-size: 11px; }
@@ -510,6 +546,8 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 /* ---------- Mobile ---------- */
 @media (max-width: 640px) {
   .topbar { padding: 16px; }
+  .status-toggle { order: 2; width: 100%; }
+  .status-btn { flex: 1; text-align: center; }
   .stats { order: 3; width: 100%; justify-content: space-around; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
   .brand h1 { font-size: 19px; }
   .field-grid { grid-template-columns: 1fr; }

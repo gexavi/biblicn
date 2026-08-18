@@ -10,6 +10,7 @@ const isbnStatus = $('#isbnStatus');
 
 let currentBooks = [];
 let viewMode = localStorage.getItem('bibliotheque_view') || 'grid';
+let currentStatus = 'possede'; // 'possede' = bibliothèque, 'souhaite' = liste de souhaits
 
 const PLACEHOLDER_COVER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="76"><rect width="52" height="76" fill="#212A36"/><text x="26" y="42" font-size="22" text-anchor="middle" fill="#57A181" font-family="serif">§</text></svg>'
@@ -33,6 +34,7 @@ async function loadStats() {
   $('#statTotal').textContent = stats.total;
   $('#statLus').textContent = stats.lus;
   $('#statPretes').textContent = stats.pretes;
+  $('#statSouhaites').textContent = stats.souhaites;
 }
 
 async function loadBooks() {
@@ -44,6 +46,7 @@ async function loadBooks() {
   const publisher = $('#filterPublisher').value;
   const owner = $('#filterOwner').value;
   const sort = $('#sortBy').value;
+  params.set('status', currentStatus);
   if (q) params.set('q', q);
   if (type) params.set('type', type);
   if (lu !== '') params.set('lu', lu);
@@ -58,7 +61,7 @@ async function loadBooks() {
 }
 
 async function loadGenreOptions() {
-  const res = await fetch('/api/genres');
+  const res = await fetch('/api/genres?status=' + currentStatus);
   const genres = await res.json();
   const select = $('#filterGenre');
   const current = select.value;
@@ -68,7 +71,7 @@ async function loadGenreOptions() {
 }
 
 async function loadPublisherOptions() {
-  const res = await fetch('/api/publishers');
+  const res = await fetch('/api/publishers?status=' + currentStatus);
   const publishers = await res.json();
   const select = $('#filterPublisher');
   const current = select.value;
@@ -78,7 +81,7 @@ async function loadPublisherOptions() {
 }
 
 async function loadOwnerOptions() {
-  const res = await fetch('/api/owners');
+  const res = await fetch('/api/owners?status=' + currentStatus);
   const owners = await res.json();
   const select = $('#filterOwner');
   const current = select.value;
@@ -108,6 +111,7 @@ function renderBookCard(book) {
   el.dataset.type = book.type;
   el.addEventListener('click', () => openEditModal(book));
 
+  const isWishlist = book.status === 'souhaite';
   const noteHtml = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '<span></span>';
   const readDateHtml = book.lu && book.read_date ? ` <span class="book-read-date">le ${formatDateFr(book.read_date)}</span>` : '';
   const statusHtml = book.lu
@@ -117,8 +121,11 @@ function renderBookCard(book) {
     ? `<div class="book-lent">Prêté à ${escapeHtml(book.lent_to)}</div>`
     : '';
   const ownerHtml = book.owner
-    ? `<div class="book-owner">📚 ${escapeHtml(book.owner)}</div>`
+    ? `<div class="book-owner">${isWishlist ? '🎁' : '📚'} ${escapeHtml(book.owner)}</div>`
     : '';
+  const metaHtml = isWishlist
+    ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
+    : `${statusHtml}${noteHtml}`;
 
   el.innerHTML = `
     <img class="book-cover" src="${escapeHtml(coverSrc(book))}" alt="" loading="lazy"
@@ -130,16 +137,36 @@ function renderBookCard(book) {
       </div>
       <p class="book-author">${escapeHtml(book.author || 'Auteur inconnu')}</p>
       ${book.genre ? `<p class="book-genre">${escapeHtml(book.genre)}</p>` : ''}
-      ${book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
+      ${!isWishlist && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
       ${ownerHtml}
       ${lentHtml}
     </div>
     <div class="book-meta">
-      ${statusHtml}
-      ${noteHtml}
+      ${metaHtml}
     </div>
   `;
+
+  if (isWishlist) {
+    el.querySelector('.quick-acquire-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      quickMarkAcquired(book.id);
+    });
+  }
+
   return el;
+}
+
+async function quickMarkAcquired(id) {
+  const res = await fetch(`/api/books/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'possede' })
+  });
+  if (res.ok) {
+    await loadBooks();
+    await loadStats();
+    refreshFilterOptions();
+  }
 }
 
 function formatDateFr(isoDate) {
@@ -184,12 +211,14 @@ function openAddModal() {
   $('#fieldReadDate').value = '';
   $('#fieldPublisher').value = '';
   $('#fieldOwner').value = '';
+  $('#fieldStatus').value = currentStatus;
   $('#isbnInput').value = '';
   isbnStatus.textContent = '';
   isbnStatus.className = 'isbn-status';
   $('#modalCoverPreview').hidden = true;
-  modalTitle.textContent = 'Ajouter un livre';
+  modalTitle.textContent = currentStatus === 'souhaite' ? 'Ajouter à la liste de souhaits' : 'Ajouter un livre';
   deleteBtn.hidden = true;
+  $('#markAcquiredBtn').hidden = true;
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
   setTimeout(() => $('#isbnInput').focus(), 50);
@@ -211,11 +240,13 @@ function openEditModal(book) {
   $('#fieldOwner').value = book.owner || '';
   $('#fieldIsbn').value = book.isbn || '';
   $('#fieldCover').value = book.cover_url || '';
+  $('#fieldStatus').value = book.status || 'possede';
   $('#isbnInput').value = book.isbn || '';
   isbnStatus.textContent = '';
   isbnStatus.className = 'isbn-status';
-  modalTitle.textContent = 'Modifier le livre';
+  modalTitle.textContent = book.status === 'souhaite' ? 'Modifier le souhait' : 'Modifier le livre';
   deleteBtn.hidden = false;
+  $('#markAcquiredBtn').hidden = book.status !== 'souhaite';
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
   updateModalCoverPreview();
@@ -340,7 +371,8 @@ bookForm.addEventListener('submit', async (e) => {
     lent_to: $('#fieldLentTo').value.trim(),
     owner: $('#fieldOwner').value.trim(),
     isbn: $('#fieldIsbn').value.trim(),
-    cover_url: $('#fieldCover').value.trim()
+    cover_url: $('#fieldCover').value.trim(),
+    status: $('#fieldStatus').value === 'souhaite' ? 'souhaite' : 'possede'
   };
 
   const url = id ? `/api/books/${id}` : '/api/books';
@@ -374,6 +406,25 @@ deleteBtn.addEventListener('click', async () => {
   }
 });
 
+$('#markAcquiredBtn').addEventListener('click', async () => {
+  const id = $('#bookId').value;
+  if (!id) return;
+  $('#fieldStatus').value = 'possede';
+  const res = await fetch(`/api/books/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'possede' })
+  });
+  if (res.ok) {
+    closeModal();
+    await loadBooks();
+    await loadStats();
+    refreshFilterOptions();
+  } else {
+    alert('Erreur lors du passage en bibliothèque.');
+  }
+});
+
 // ---------- Filtres ----------
 let searchDebounce;
 $('#searchInput').addEventListener('input', () => {
@@ -398,6 +449,18 @@ function setViewMode(mode) {
 $('#viewGridBtn').addEventListener('click', () => setViewMode('grid'));
 $('#viewListBtn').addEventListener('click', () => setViewMode('list'));
 setViewMode(viewMode);
+
+// ---------- Bibliothèque / Liste de souhaits ----------
+function setStatus(status) {
+  currentStatus = status;
+  $('#viewLibraryBtn').classList.toggle('active', status === 'possede');
+  $('#viewWishlistBtn').classList.toggle('active', status === 'souhaite');
+  $('#openAddBtn').textContent = status === 'souhaite' ? '+ Ajouter un souhait' : '+ Ajouter un livre';
+  loadBooks();
+  refreshFilterOptions();
+}
+$('#viewLibraryBtn').addEventListener('click', () => setStatus('possede'));
+$('#viewWishlistBtn').addEventListener('click', () => setStatus('souhaite'));
 
 // ---------- Import en masse ----------
 const bulkModalBackdrop = $('#bulkModalBackdrop');
