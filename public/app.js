@@ -45,6 +45,7 @@ async function loadBooks() {
   const genre = $('#filterGenre').value;
   const publisher = $('#filterPublisher').value;
   const owner = $('#filterOwner').value;
+  const minNote = $('#filterNote').value;
   const sort = $('#sortBy').value;
   params.set('status', currentStatus);
   if (q) params.set('q', q);
@@ -53,6 +54,7 @@ async function loadBooks() {
   if (genre) params.set('genre', genre);
   if (publisher) params.set('publisher', publisher);
   if (owner) params.set('owner', owner);
+  if (minNote) params.set('minNote', minNote);
   if (sort) params.set('sort', sort);
 
   const res = await fetch('/api/books?' + params.toString());
@@ -219,6 +221,7 @@ function openAddModal() {
   modalTitle.textContent = currentStatus === 'souhaite' ? 'Ajouter à la liste de souhaits' : 'Ajouter un livre';
   deleteBtn.hidden = true;
   $('#markAcquiredBtn').hidden = true;
+  $('#secondhandLinks').hidden = true;
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
   setTimeout(() => $('#isbnInput').focus(), 50);
@@ -247,9 +250,23 @@ function openEditModal(book) {
   modalTitle.textContent = book.status === 'souhaite' ? 'Modifier le souhait' : 'Modifier le livre';
   deleteBtn.hidden = false;
   $('#markAcquiredBtn').hidden = book.status !== 'souhaite';
+  updateSecondhandLinks(book);
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
   updateModalCoverPreview();
+}
+
+function updateSecondhandLinks(book) {
+  const wrap = $('#secondhandLinks');
+  if (!book || book.status !== 'souhaite' || !book.title) {
+    wrap.hidden = true;
+    return;
+  }
+  const query = encodeURIComponent(`${book.title} ${book.author || ''}`.trim());
+  $('#linkGibert').href = `https://www.google.com/search?q=site%3Agibert.com+${query}`;
+  $('#linkMomox').href = `https://www.google.com/search?q=site%3Amomox-shop.fr+${query}`;
+  $('#linkRecyclivre').href = `https://www.google.com/search?q=site%3Arecyclivre.com+${query}`;
+  wrap.hidden = false;
 }
 
 function closeModal() {
@@ -436,6 +453,7 @@ $('#filterLu').addEventListener('change', loadBooks);
 $('#filterGenre').addEventListener('change', loadBooks);
 $('#filterPublisher').addEventListener('change', loadBooks);
 $('#filterOwner').addEventListener('change', loadBooks);
+$('#filterNote').addEventListener('change', loadBooks);
 $('#sortBy').addEventListener('change', loadBooks);
 
 // ---------- Vue grille / liste ----------

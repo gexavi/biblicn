@@ -443,6 +443,30 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 .field-full { grid-column: 1 / -1; }
 .field-full input { font-family: var(--font-mono); font-size: 13px; }
 
+.secondhand-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: rgba(208,166,63,.08);
+  border: 1px solid rgba(208,166,63,.25);
+  border-radius: var(--radius);
+}
+.secondhand-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.secondhand-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brass);
+  text-decoration: none;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+}
+.secondhand-link:hover { background: var(--brass); color: #241B04; }
+.secondhand-note { font-size: 11px; color: var(--ink-soft); flex-basis: 100%; }
+
 .modal-actions {
   display: flex;
   justify-content: space-between;

@@ -57,6 +57,14 @@
   <select id="filterOwner" class="select">
     <option value="">Appartient à (tous)</option>
   </select>
+  <select id="filterNote" class="select">
+    <option value="">Toutes les notes</option>
+    <option value="18">18/20 et plus</option>
+    <option value="16">16/20 et plus</option>
+    <option value="14">14/20 et plus</option>
+    <option value="12">12/20 et plus</option>
+    <option value="10">10/20 et plus</option>
+  </select>
   <select id="sortBy" class="select">
     <option value="recent">Récemment ajoutés</option>
     <option value="title">Titre (A-Z)</option>
@@ -156,6 +164,14 @@
       </div>
       <input type="hidden" id="fieldIsbn">
       <input type="hidden" id="fieldStatus" value="possede">
+
+      <div class="secondhand-links" id="secondhandLinks" hidden>
+        <span class="secondhand-label">Vérifier l'occasion :</span>
+        <a href="#" id="linkGibert" target="_blank" rel="noopener" class="secondhand-link">🔍 Gibert</a>
+        <a href="#" id="linkMomox" target="_blank" rel="noopener" class="secondhand-link">🔍 Momox</a>
+        <a href="#" id="linkRecyclivre" target="_blank" rel="noopener" class="secondhand-link">🔍 RecycLivre</a>
+        <span class="secondhand-note">(ouvre une recherche Google ciblée sur le site — prix et dispo à vérifier sur place)</span>
+      </div>
 
       <div class="modal-actions">
         <button type="button" class="btn btn-danger" id="deleteBtn" hidden>Supprimer</button>

@@ -418,7 +418,7 @@ app.get('/api/isbn/:isbn', async (req, res) => {
 
 // ---------- CRUD Livres ----------
 app.get('/api/books', (req, res) => {
-  const { q, type, genre, lu, sort, publisher, owner, status } = req.query;
+  const { q, type, genre, lu, sort, publisher, owner, status, minNote } = req.query;
   let query = 'SELECT * FROM books WHERE 1=1';
   const params = [];
 
@@ -446,6 +446,10 @@ app.get('/api/books', (req, res) => {
   if (owner) {
     query += ' AND owner LIKE ?';
     params.push(`%${owner}%`);
+  }
+  if (minNote) {
+    query += ' AND note >= ?';
+    params.push(Number(minNote));
   }
   if (lu === '1' || lu === '0') {
     query += ' AND lu = ?';
