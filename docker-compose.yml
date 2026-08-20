@@ -8,4 +8,4 @@ services:
     volumes:
       # Modifiez la partie gauche pour un dossier de votre NAS, ex :
       # /volume1/docker/bibliotheque/data:/app/data
-      - ./data:/app/data
+      - /volume1/docker/bibliotheque/data:/app/data
