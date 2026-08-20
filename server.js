@@ -730,6 +730,44 @@ app.post('/api/covers/localize-all', async (req, res) => {
   res.json({ total: toProcess.length, done, failed, alreadyLocal: rows.length - toProcess.length });
 });
 
+// Statistiques par propriétaire : nombre de livres possédés, répartition par
+// genre, et répartition des lectures par année. Un livre peut avoir plusieurs
+// propriétaires (ex. "Papa, Fils") et plusieurs genres séparés par des
+// virgules ; chaque nom/genre compte pour lui-même, comme pour les filtres.
+app.get('/api/stats/owners', (req, res) => {
+  const rows = db.prepare("SELECT owner, genre, lu, read_date FROM books WHERE status = 'possede'").all();
+  const owners = new Map(); // nom -> { total, byGenre: Map, byYear: Map }
+
+  const getOwnerEntry = (name) => {
+    if (!owners.has(name)) owners.set(name, { total: 0, byGenre: new Map(), byYear: new Map() });
+    return owners.get(name);
+  };
+  const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
+
+  for (const row of rows) {
+    const ownerNames = (row.owner || '').split(',').map(o => o.trim()).filter(Boolean);
+    const names = ownerNames.length ? ownerNames : ['Sans propriétaire'];
+    const genres = (row.genre || '').split(',').map(g => g.trim()).filter(Boolean);
+    const year = (row.lu && row.read_date) ? row.read_date.slice(0, 4) : null;
+
+    for (const name of names) {
+      const entry = getOwnerEntry(name);
+      entry.total++;
+      genres.forEach(g => bump(entry.byGenre, g));
+      if (year) bump(entry.byYear, year);
+    }
+  }
+
+  const result = [...owners.entries()].map(([name, entry]) => ({
+    name,
+    total: entry.total,
+    byGenre: [...entry.byGenre.entries()].sort((a, b) => b[1] - a[1]).map(([genre, count]) => ({ genre, count })),
+    byYear: [...entry.byYear.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([year, count]) => ({ year, count }))
+  })).sort((a, b) => b.total - a.total);
+
+  res.json(result);
+});
+
 app.get('/api/stats', (req, res) => {
   const total = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'possede'").get().c;
   const lus = db.prepare("SELECT COUNT(*) c FROM books WHERE status = 'possede' AND lu = 1").get().c;

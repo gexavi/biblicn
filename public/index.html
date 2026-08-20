@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bibliothèque ChickNours</title>
+<title>Ma Bibliothèque</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark">§</span>
-    <h1>Bibliothèque ChickNours</h1>
+    <h1>Ma Bibliothèque</h1>
   </div>
   <div class="status-toggle" role="group" aria-label="Bibliothèque ou liste de souhaits">
     <button class="status-btn active" id="viewLibraryBtn" type="button">📚 Ma bibliothèque</button>
@@ -28,6 +28,7 @@
     <div class="stat"><strong id="statPretes">0</strong><span>prêtés</span></div>
     <div class="stat"><strong id="statSouhaites">0</strong><span>souhaités</span></div>
   </div>
+  <button class="btn btn-ghost btn-bordered" id="openStatsBtn">📊 Statistiques</button>
   <button class="btn btn-ghost btn-bordered" id="localizeCoversBtn" title="Télécharge et optimise en local les couvertures qui pointent encore vers une source externe">🖼️ Optimiser les couvertures</button>
   <button class="btn btn-ghost btn-bordered" id="openBulkBtn">Import en masse</button>
   <button class="btn btn-primary" id="openAddBtn">+ Ajouter un livre</button>
@@ -251,6 +252,15 @@
   <p class="scanner-hint">Visez le code-barres ISBN au dos du livre (le plus souvent EAN-13, sous le prix).</p>
   <div id="barcodeReaderRegion"></div>
   <p class="scanner-status" id="scannerStatus"></p>
+</div>
+
+<!-- Overlay de statistiques par propriétaire -->
+<div class="scanner-overlay" id="statsOverlay" hidden>
+  <div class="scanner-head">
+    <h2>Statistiques par propriétaire</h2>
+    <button class="icon-btn" id="closeStatsBtn" aria-label="Fermer">✕</button>
+  </div>
+  <div id="ownerStatsContent" class="owner-stats-content"></div>
 </div>
 
 <script src="app.js"></script>

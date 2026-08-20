@@ -673,6 +673,61 @@ $('#downloadTemplateBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// ---------- Statistiques par propriétaire ----------
+$('#openStatsBtn').addEventListener('click', openStatsOverlay);
+$('#closeStatsBtn').addEventListener('click', () => { $('#statsOverlay').hidden = true; });
+
+async function openStatsOverlay() {
+  $('#statsOverlay').hidden = false;
+  const content = $('#ownerStatsContent');
+  content.innerHTML = '<p class="owner-stats-empty">Chargement…</p>';
+  try {
+    const res = await fetch('/api/stats/owners');
+    const owners = await res.json();
+    renderOwnerStats(owners);
+  } catch (err) {
+    content.innerHTML = '<p class="owner-stats-empty">Erreur lors du chargement des statistiques.</p>';
+  }
+}
+
+function renderOwnerStats(owners) {
+  const content = $('#ownerStatsContent');
+  if (!owners.length) {
+    content.innerHTML = '<p class="owner-stats-empty">Aucun livre avec un propriétaire renseigné pour le moment.</p>';
+    return;
+  }
+  content.innerHTML = owners.map(renderOwnerCard).join('');
+}
+
+function renderBarSection(title, items, maxItems) {
+  if (!items.length) return `<div class="owner-stats-section"><p class="owner-stats-section-title">${title}</p><p class="owner-stats-empty">Aucune donnée</p></div>`;
+  const shown = items.slice(0, maxItems);
+  const max = Math.max(...shown.map(i => i.count));
+  const rows = shown.map(item => {
+    const label = item.genre || item.year;
+    const pct = Math.round((item.count / max) * 100);
+    return `
+      <div class="owner-stats-bar-row">
+        <span class="owner-stats-bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+        <span class="owner-stats-bar-track"><span class="owner-stats-bar-fill" style="width:${pct}%"></span></span>
+        <span class="owner-stats-bar-count">${item.count}</span>
+      </div>`;
+  }).join('');
+  return `<div class="owner-stats-section"><p class="owner-stats-section-title">${title}</p>${rows}</div>`;
+}
+
+function renderOwnerCard(owner) {
+  return `
+    <div class="owner-card">
+      <div class="owner-card-head">
+        <h3>${escapeHtml(owner.name)}</h3>
+        <span class="owner-card-total">${owner.total} livre${owner.total > 1 ? 's' : ''}</span>
+      </div>
+      ${renderBarSection('Par genre', owner.byGenre, 6)}
+      ${renderBarSection('Lus par année', owner.byYear, 8)}
+    </div>`;
+}
+
 // ---------- Optimisation des couvertures existantes ----------
 $('#localizeCoversBtn').addEventListener('click', async () => {
   const btn = $('#localizeCoversBtn');
