@@ -12,6 +12,6 @@ services:
       - AUTH_USERNAME=admin
       - AUTH_PASSWORD=changeme
     volumes:
-      # Modifiez la partie gauche pour un dossier de votre NAS, ex :
-      # /volume1/docker/bibliotheque/data:/app/data
-      - ./data:/app/data
+      # Chemin absolu obligatoire (Portainer gère mal les chemins relatifs
+      # comme ./data) — adaptez si votre dossier NAS est différent.
+      - /volume1/docker/bibliotheque/data:/app/data
