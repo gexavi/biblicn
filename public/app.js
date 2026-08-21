@@ -277,7 +277,10 @@ function updateSecondhandLinks(book) {
     wrap.hidden = true;
     return;
   }
-  const query = encodeURIComponent(`${book.title} ${book.author || ''}`.trim());
+  // L'ISBN identifie une édition précise (contrairement au titre, qui peut
+  // renvoyer n'importe quelle édition du livre) — on le préfère quand il est
+  // renseigné, pour retrouver la même édition que celle de la fiche.
+  const query = encodeURIComponent(book.isbn ? book.isbn : `${book.title} ${book.author || ''}`.trim());
   $('#linkGibert').href = `https://www.google.com/search?q=site%3Agibert.com+${query}`;
   $('#linkMomox').href = `https://www.google.com/search?q=site%3Amomox-shop.fr+${query}`;
   $('#linkRecyclivre').href = `https://www.google.com/search?q=site%3Arecyclivre.com+${query}`;
