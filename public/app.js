@@ -732,6 +732,27 @@ function renderBarSection(title, items, maxItems) {
   return `<div class="owner-stats-section"><p class="owner-stats-section-title">${title}</p>${rows}</div>`;
 }
 
+const YEAR_CHART_MAX_HEIGHT = 90;
+
+function renderYearChart(items) {
+  if (!items.length) return '<div class="owner-stats-section"><p class="owner-stats-section-title">Lus par année</p><p class="owner-stats-empty">Aucune donnée</p></div>';
+  const sorted = [...items].sort((a, b) => a.year.localeCompare(b.year));
+  const max = Math.max(...sorted.map(i => i.count));
+  const cols = sorted.map(item => {
+    const h = Math.max(6, Math.round((item.count / max) * YEAR_CHART_MAX_HEIGHT));
+    const label = `${item.count} livre${item.count > 1 ? 's' : ''} en ${item.year}`;
+    return `
+      <div class="year-chart-col" title="${escapeHtml(label)}">
+        <div class="year-chart-track">
+          <span class="year-chart-value">${item.count}</span>
+          <span class="year-chart-bar" style="height:${h}px"></span>
+        </div>
+        <span class="year-chart-year">${escapeHtml(item.year)}</span>
+      </div>`;
+  }).join('');
+  return `<div class="owner-stats-section"><p class="owner-stats-section-title">Lus par année</p><div class="year-chart">${cols}</div></div>`;
+}
+
 function renderOwnerCard(owner) {
   return `
     <div class="owner-card">
@@ -740,7 +761,7 @@ function renderOwnerCard(owner) {
         <span class="owner-card-total">${owner.total} livre${owner.total > 1 ? 's' : ''}</span>
       </div>
       ${renderBarSection('Par genre', owner.byGenre, 6)}
-      ${renderBarSection('Lus par année', owner.byYear, 8)}
+      ${renderYearChart(owner.byYear)}
     </div>`;
 }
 
