@@ -278,9 +278,12 @@ function updateSecondhandLinks(book) {
     return;
   }
   // L'ISBN identifie une édition précise (contrairement au titre, qui peut
-  // renvoyer n'importe quelle édition du livre) — on le préfère quand il est
-  // renseigné, pour retrouver la même édition que celle de la fiche.
-  const query = encodeURIComponent(book.isbn ? book.isbn : `${book.title} ${book.author || ''}`.trim());
+  // renvoyer n'importe quelle édition du livre) mais tous les sites ne
+  // l'indexent pas en texte visible (Momox et RecycLivre notamment) : on le
+  // met en priorité via un OR, avec titre+auteur en repli dans la même
+  // recherche plutôt qu'un choix strict qui peut ne renvoyer aucun résultat.
+  const titleAuthor = `${book.title} ${book.author || ''}`.trim();
+  const query = encodeURIComponent(book.isbn ? `${book.isbn} OR (${titleAuthor})` : titleAuthor);
   $('#linkGibert').href = `https://www.google.com/search?q=site%3Agibert.com+${query}`;
   $('#linkMomox').href = `https://www.google.com/search?q=site%3Amomox-shop.fr+${query}`;
   $('#linkRecyclivre').href = `https://www.google.com/search?q=site%3Arecyclivre.com+${query}`;
