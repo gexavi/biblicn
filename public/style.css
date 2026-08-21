@@ -621,10 +621,10 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 }
 .year-chart-bar {
   width: 22px;
-  background: var(--forest);
   border-radius: 4px 4px 0 0;
+  transition: filter .15s ease;
 }
-.year-chart-col:hover .year-chart-bar { background: #6BB794; }
+.year-chart-col:hover .year-chart-bar { filter: brightness(1.15); }
 .year-chart-year {
   margin-top: 8px;
   font-size: 11px;

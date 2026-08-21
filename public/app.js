@@ -733,19 +733,22 @@ function renderBarSection(title, items, maxItems) {
 }
 
 const YEAR_CHART_MAX_HEIGHT = 90;
+// Palette catégorielle validée (contraste + séparation daltonisme) sur fond sombre.
+const YEAR_CHART_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 
 function renderYearChart(items) {
   if (!items.length) return '<div class="owner-stats-section"><p class="owner-stats-section-title">Lus par année</p><p class="owner-stats-empty">Aucune donnée</p></div>';
   const sorted = [...items].sort((a, b) => a.year.localeCompare(b.year));
   const max = Math.max(...sorted.map(i => i.count));
-  const cols = sorted.map(item => {
+  const cols = sorted.map((item, idx) => {
     const h = Math.max(6, Math.round((item.count / max) * YEAR_CHART_MAX_HEIGHT));
+    const color = YEAR_CHART_COLORS[idx % YEAR_CHART_COLORS.length];
     const label = `${item.count} livre${item.count > 1 ? 's' : ''} en ${item.year}`;
     return `
       <div class="year-chart-col" title="${escapeHtml(label)}">
         <div class="year-chart-track">
           <span class="year-chart-value">${item.count}</span>
-          <span class="year-chart-bar" style="height:${h}px"></span>
+          <span class="year-chart-bar" style="height:${h}px;background:${color}"></span>
         </div>
         <span class="year-chart-year">${escapeHtml(item.year)}</span>
       </div>`;
