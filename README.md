@@ -44,15 +44,17 @@ Pour un accès distant sécurisé, le plus simple est de passer par le **Reverse
 
 ## Connexion
 
-L'application est protégée par un identifiant et un mot de passe uniques, partagés par tout le foyer (pas de comptes individuels). Avant le premier démarrage, modifiez ces valeurs dans `docker-compose.yml` :
+L'application est protégée par un identifiant et un mot de passe uniques, partagés par tout le foyer (pas de comptes individuels). Le `docker-compose.yml` lit ces valeurs depuis les variables `AUTH_USERNAME`/`AUTH_PASSWORD` sans valeur par défaut : l'application (et même le déploiement de la stack) refuse de démarrer tant qu'elles ne sont pas définies, pour éviter de tourner avec un mot de passe oublié à sa valeur par défaut.
 
-```yaml
-environment:
-  - AUTH_USERNAME=admin
-  - AUTH_PASSWORD=changeme
+**Avec Portainer** : ouvrez la stack → onglet **Environment variables** → ajoutez `AUTH_USERNAME` et `AUTH_PASSWORD` avec vos valeurs, puis redéployez. Ne les modifiez pas directement dans le fichier `docker-compose.yml` affiché — Portainer les injecte séparément au moment du déploiement.
+
+**En ligne de commande (`docker compose`)** : créez un fichier `.env` à côté de `docker-compose.yml` :
+```
+AUTH_USERNAME=admin
+AUTH_PASSWORD=votre_mot_de_passe
 ```
 
-L'application refuse de démarrer si ces deux variables ne sont pas définies. Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
+Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
 
 ## Changer le port
 
