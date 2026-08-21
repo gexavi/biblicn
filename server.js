@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const fetch = require('node-fetch');
 const sharp = require('sharp');
@@ -9,6 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const COVERS_DIR = path.join(DATA_DIR, 'covers');
+
+// ---------- Authentification (accès unique) ----------
+// Un seul couple identifiant/mot de passe, défini par variables d'environnement
+// (voir docker-compose.yml). L'app refuse de démarrer sans eux plutôt que de
+// tourner sans protection par erreur.
+const AUTH_USERNAME = process.env.AUTH_USERNAME;
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
+if (!AUTH_USERNAME || !AUTH_PASSWORD) {
+  console.error('AUTH_USERNAME et AUTH_PASSWORD doivent être définis (voir docker-compose.yml). Arrêt.');
+  process.exit(1);
+}
+const SESSION_COOKIE = 'bibli_session';
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -56,7 +70,79 @@ if (!existingColumns.includes('status')) {
   db.exec("UPDATE books SET status = 'possede' WHERE status IS NULL");
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    created_at TEXT DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+  )
+`);
+// Sessions stockées en base (et non en mémoire) pour survivre aux redémarrages
+// du conteneur sans déconnecter l'utilisateur à chaque mise à jour du NAS.
+db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
+setInterval(() => {
+  db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
+}, 60 * 60 * 1000).unref();
+
+function safeCompare(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie;
+  const cookies = {};
+  if (!header) return cookies;
+  header.split(';').forEach(pair => {
+    const idx = pair.indexOf('=');
+    if (idx === -1) return;
+    cookies[pair.slice(0, idx).trim()] = decodeURIComponent(pair.slice(idx + 1).trim());
+  });
+  return cookies;
+}
+
+function isValidSession(token) {
+  if (!token) return false;
+  const row = db.prepare("SELECT 1 FROM sessions WHERE token = ? AND expires_at > datetime('now')").get(token);
+  return !!row;
+}
+
 app.use(express.json());
+
+const PUBLIC_PATHS = new Set(['/login.html', '/api/login', '/style.css']);
+
+app.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path)) return next();
+  const { [SESSION_COOKIE]: token } = parseCookies(req);
+  if (isValidSession(token)) return next();
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Non authentifié' });
+  }
+  return res.redirect('/login.html');
+});
+
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const validUser = typeof username === 'string' && safeCompare(username, AUTH_USERNAME);
+  const validPass = typeof password === 'string' && safeCompare(password, AUTH_PASSWORD);
+  if (!validUser || !validPass) {
+    return res.status(401).json({ error: 'Identifiant ou mot de passe incorrect' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
+  db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)').run(token, expiresAt);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION_MS / 1000}; Path=/`);
+  res.json({ ok: true });
+});
+
+app.post('/api/logout', (req, res) => {
+  const { [SESSION_COOKIE]: token } = parseCookies(req);
+  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`);
+  res.json({ ok: true });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/covers', express.static(COVERS_DIR, { maxAge: '30d' }));
 

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexion — Ma Bibliothèque</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-image:
+      linear-gradient(rgba(8, 11, 16, .6), rgba(8, 11, 16, .6)),
+      url('https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fculturezvous.com%2Fwp-content%2Fuploads%2F2025%2F02%2Fbibliotheque-rijksmuseum.webp&f=1&nofb=1&ipt=93c5e6e17903b64112b0529c88721bbe98a228413e6a87c792ef2f0c50884b7d');
+    background-size: cover;
+    background-position: center;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 30px 28px 26px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    margin: 16px;
+  }
+  .login-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 22px;
+  }
+  .login-brand .brand-mark {
+    font-family: var(--font-display);
+    font-size: 30px;
+    color: var(--brass);
+    line-height: 1;
+  }
+  .login-brand h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 20px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .login-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .login-field label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .login-field input {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+  }
+  .login-field input:focus { outline: 1px solid var(--brass); }
+  .login-error {
+    min-height: 18px;
+    font-size: 13px;
+    color: var(--burgundy);
+    margin: 2px 0 14px;
+  }
+  .login-submit { width: 100%; padding: 11px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<form class="login-card" id="loginForm" autocomplete="on">
+  <div class="login-brand">
+    <span class="brand-mark">§</span>
+    <h1>Ma Bibliothèque</h1>
+  </div>
+  <div class="login-field">
+    <label for="username">Identifiant</label>
+    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+  </div>
+  <div class="login-field">
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required>
+  </div>
+  <div class="login-error" id="loginError"></div>
+  <button type="submit" class="btn btn-primary login-submit" id="loginSubmit">Se connecter</button>
+</form>
+
+<script>
+const form = document.getElementById('loginForm');
+const errorEl = document.getElementById('loginError');
+const submitBtn = document.getElementById('loginSubmit');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorEl.textContent = '';
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Connexion…';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+      }),
+    });
+    if (res.ok) {
+      window.location.href = '/';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    errorEl.textContent = data.error || 'Connexion impossible';
+  } catch (err) {
+    errorEl.textContent = 'Erreur réseau, réessayez';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Se connecter';
+  }
+});
+</script>
+</body>
+</html>

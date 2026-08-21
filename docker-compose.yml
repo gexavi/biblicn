@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     ports:
       - "7000:3000"
+    environment:
+      # Identifiant/mot de passe de connexion à l'application (accès unique,
+      # partagé par tout le foyer). Changez ces valeurs avant le premier
+      # démarrage : l'application refuse de démarrer si elles sont absentes.
+      - AUTH_USERNAME=admin
+      - AUTH_PASSWORD=changeme
     volumes:
       # Modifiez la partie gauche pour un dossier de votre NAS, ex :
       # /volume1/docker/bibliotheque/data:/app/data

@@ -1,3 +1,14 @@
+// Redirige vers la connexion si la session a expiré pendant l'utilisation
+// (cookie arrivé à échéance, ou base de sessions vidée côté serveur).
+const _fetch = window.fetch;
+window.fetch = async (...args) => {
+  const res = await _fetch(...args);
+  if (res.status === 401) {
+    window.location.href = '/login.html';
+  }
+  return res;
+};
+
 const $ = (sel) => document.querySelector(sel);
 
 const shelfEl = $('#shelf');
@@ -273,6 +284,11 @@ function closeModal() {
   modalBackdrop.hidden = true;
   closeBarcodeScanner();
 }
+
+$('#logoutBtn').addEventListener('click', async () => {
+  await _fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/login.html';
+});
 
 $('#openAddBtn').addEventListener('click', openAddModal);
 $('#emptyAddBtn').addEventListener('click', openAddModal);

@@ -42,6 +42,18 @@ L'application est une simple page web responsive : ouvrez `http://IP_DE_VOTRE_NA
 
 Pour un accès distant sécurisé, le plus simple est de passer par le **Reverse Proxy** intégré au DSM (Panneau de configuration → Portail des applications → Reverse Proxy) en pointant un sous-domaine vers `localhost:3000`, combiné à Quick Connect ou un certificat Let's Encrypt déjà configuré sur votre NAS.
 
+## Connexion
+
+L'application est protégée par un identifiant et un mot de passe uniques, partagés par tout le foyer (pas de comptes individuels). Avant le premier démarrage, modifiez ces valeurs dans `docker-compose.yml` :
+
+```yaml
+environment:
+  - AUTH_USERNAME=admin
+  - AUTH_PASSWORD=changeme
+```
+
+L'application refuse de démarrer si ces deux variables ne sont pas définies. Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
+
 ## Changer le port
 
 L'application est configurée pour être accessible sur le port **7000**. Si besoin, modifiez `docker-compose.yml` :
