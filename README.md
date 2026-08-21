@@ -38,9 +38,15 @@ sudo docker compose up -d --build
 
 ### Accès mobile et web
 
-L'application est une simple page web responsive : ouvrez `http://IP_DE_VOTRE_NAS:7000` depuis le navigateur de votre téléphone (connecté au même réseau, ou via votre VPN/reverse proxy Synology si vous voulez y accéder depuis l'extérieur) et éventuellement ajoutez-la à l'écran d'accueil pour un accès en un clic.
+L'application est une simple page web responsive : ouvrez `http://IP_DE_VOTRE_NAS:7000` depuis le navigateur de votre téléphone (connecté au même réseau, ou via votre VPN/reverse proxy Synology si vous voulez y accéder depuis l'extérieur).
 
 Pour un accès distant sécurisé, le plus simple est de passer par le **Reverse Proxy** intégré au DSM (Panneau de configuration → Portail des applications → Reverse Proxy) en pointant un sous-domaine vers `localhost:3000`, combiné à Quick Connect ou un certificat Let's Encrypt déjà configuré sur votre NAS.
+
+### Installation en application (PWA)
+
+L'application est installable comme une vraie app, avec sa propre icône et sans barre d'adresse de navigateur. Une fois connecté depuis un navigateur mobile, utilisez le menu du navigateur → **Ajouter à l'écran d'accueil** (Android/Chrome) ou **Partager → Sur l'écran d'accueil** (iPhone/Safari).
+
+**Nécessite HTTPS**, comme le scanner de code-barres (voir la section dédiée plus bas) — les navigateurs n'autorisent l'installation d'une PWA que sur une connexion sécurisée. Sans HTTPS, l'application reste utilisable normalement, seule l'option d'installation n'apparaît pas.
 
 ## Connexion
 
@@ -67,6 +73,8 @@ ports:
 ## Sauvegarde
 
 Toutes les données sont dans le dossier `data/` (fichier `bibliotheque.db`). Il suffit de sauvegarder ce dossier (Hyper Backup, snapshot du volume partagé, etc.) pour sauvegarder toute la bibliothèque.
+
+**Sauvegarde automatique intégrée** : en plus de la sauvegarde NAS ci-dessus, l'application copie elle-même la base et les couvertures dans `data/backup/AAAA-MM-JJ/` tous les 15 jours (au démarrage si la dernière sauvegarde a plus de 15 jours, puis à intervalle régulier tant que le conteneur tourne). Les 6 dernières sont conservées (~3 mois d'historique), les plus anciennes sont supprimées automatiquement. La base est sauvegardée à chaud via l'API de backup de SQLite (pas une simple copie de fichier), donc sans risque de corruption même si l'application est utilisée au moment de la sauvegarde.
 
 ## Développement / test en local (sans Docker)
 

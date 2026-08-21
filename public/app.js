@@ -9,6 +9,10 @@ window.fetch = async (...args) => {
   return res;
 };
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
 const $ = (sel) => document.querySelector(sel);
 
 const shelfEl = $('#shelf');

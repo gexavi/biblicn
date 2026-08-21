@@ -862,6 +862,60 @@ app.get('/api/stats', (req, res) => {
   res.json({ total, lus, pretes, souhaites });
 });
 
+// ---------- Sauvegarde automatique ----------
+// Copie périodique de la base et des couvertures dans data/backup/, en plus
+// de la sauvegarde NAS habituelle (Hyper Backup, snapshot...) qui protège
+// tout /app/data. La base est sauvegardée via l'API de backup à chaud de
+// SQLite (db.backup), pas une simple copie de fichier : une copie brute d'un
+// .db en WAL actif peut capturer un état incohérent en cas d'écriture
+// concurrente, alors que db.backup() produit un instantané cohérent.
+const BACKUP_DIR = path.join(DATA_DIR, 'backup');
+const BACKUP_INTERVAL_MS = 15 * 24 * 60 * 60 * 1000; // 15 jours
+const BACKUP_KEEP = 6; // ~3 mois d'historique à ce rythme
+
+function pruneOldBackups() {
+  const dirs = fs.readdirSync(BACKUP_DIR)
+    .filter(name => /^\d{4}-\d{2}-\d{2}$/.test(name))
+    .sort();
+  while (dirs.length > BACKUP_KEEP) {
+    fs.rmSync(path.join(BACKUP_DIR, dirs.shift()), { recursive: true, force: true });
+  }
+}
+
+async function performBackup() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const dest = path.join(BACKUP_DIR, stamp);
+  if (fs.existsSync(dest)) return; // déjà fait aujourd'hui (ex. redémarrage du conteneur)
+  fs.mkdirSync(dest, { recursive: true });
+  try {
+    await db.backup(path.join(dest, 'bibliotheque.db'));
+    if (fs.existsSync(COVERS_DIR)) {
+      fs.cpSync(COVERS_DIR, path.join(dest, 'covers'), { recursive: true });
+    }
+    console.log(`Sauvegarde automatique effectuée dans ${dest}`);
+  } catch (err) {
+    console.error('Échec de la sauvegarde automatique :', err.message);
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
+  pruneOldBackups();
+}
+
+function scheduleBackups() {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const existing = fs.readdirSync(BACKUP_DIR).filter(name => /^\d{4}-\d{2}-\d{2}$/.test(name)).sort();
+  const lastBackup = existing.length ? new Date(existing[existing.length - 1]) : null;
+  const elapsed = lastBackup ? Date.now() - lastBackup.getTime() : Infinity;
+  const delay = elapsed >= BACKUP_INTERVAL_MS ? 0 : BACKUP_INTERVAL_MS - elapsed;
+
+  setTimeout(() => {
+    performBackup().finally(() => {
+      setInterval(performBackup, BACKUP_INTERVAL_MS).unref();
+    });
+  }, delay).unref();
+}
+
+scheduleBackups();
+
 app.listen(PORT, () => {
   console.log(`Bibliothèque disponible sur le port ${PORT}`);
 });
