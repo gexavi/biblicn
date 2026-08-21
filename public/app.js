@@ -725,26 +725,52 @@ function renderOwnerStats(owners) {
   content.innerHTML = owners.map(renderOwnerCard).join('');
 }
 
-function renderBarSection(title, items, maxItems) {
-  if (!items.length) return `<div class="owner-stats-section"><p class="owner-stats-section-title">${title}</p><p class="owner-stats-empty">Aucune donnée</p></div>`;
-  const shown = items.slice(0, maxItems);
-  const max = Math.max(...shown.map(i => i.count));
-  const rows = shown.map(item => {
-    const label = item.genre || item.year;
-    const pct = Math.round((item.count / max) * 100);
-    return `
-      <div class="owner-stats-bar-row">
-        <span class="owner-stats-bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-        <span class="owner-stats-bar-track"><span class="owner-stats-bar-fill" style="width:${pct}%"></span></span>
-        <span class="owner-stats-bar-count">${item.count}</span>
-      </div>`;
-  }).join('');
-  return `<div class="owner-stats-section"><p class="owner-stats-section-title">${title}</p>${rows}</div>`;
-}
-
 const YEAR_CHART_MAX_HEIGHT = 90;
 // Palette catégorielle validée (contraste + séparation daltonisme) sur fond sombre.
-const YEAR_CHART_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+const CHART_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+const GENRE_DONUT_MAX_SLICES = 5; // + 1 tranche "Autres" si besoin, pour rester lisible (≤ 6 tranches)
+
+function renderGenreDonut(items) {
+  if (!items.length) return '<div class="owner-stats-section"><p class="owner-stats-section-title">Par genre</p><p class="owner-stats-empty">Aucune donnée</p></div>';
+  const sorted = [...items].sort((a, b) => b.count - a.count);
+  const total = sorted.reduce((sum, i) => sum + i.count, 0);
+  let slices = sorted.slice(0, GENRE_DONUT_MAX_SLICES);
+  const rest = sorted.slice(GENRE_DONUT_MAX_SLICES);
+  if (rest.length) {
+    slices = [...slices, { genre: 'Autres', count: rest.reduce((sum, i) => sum + i.count, 0) }];
+  }
+
+  const colorFor = (slice, idx) => slice.genre === 'Autres' ? 'var(--ink-soft)' : CHART_COLORS[idx % CHART_COLORS.length];
+
+  let cursor = 0;
+  const stops = slices.map((slice, idx) => {
+    const start = (cursor / total) * 100;
+    cursor += slice.count;
+    const end = (cursor / total) * 100;
+    return `${colorFor(slice, idx)} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  }).join(', ');
+
+  const legend = slices.map((slice, idx) => {
+    const pct = Math.round((slice.count / total) * 100);
+    return `
+      <div class="genre-donut-legend-row">
+        <span class="genre-donut-swatch" style="background:${colorFor(slice, idx)}"></span>
+        <span class="genre-donut-legend-label" title="${escapeHtml(slice.genre)}">${escapeHtml(slice.genre)}</span>
+        <span class="genre-donut-legend-value">${slice.count} · ${pct}%</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="owner-stats-section">
+      <p class="owner-stats-section-title">Par genre</p>
+      <div class="genre-donut-wrap">
+        <div class="genre-donut" style="background: conic-gradient(${stops});">
+          <div class="genre-donut-hole"><span class="genre-donut-total">${total}</span></div>
+        </div>
+        <div class="genre-donut-legend">${legend}</div>
+      </div>
+    </div>`;
+}
 
 function renderYearChart(items) {
   if (!items.length) return '<div class="owner-stats-section"><p class="owner-stats-section-title">Lus par année</p><p class="owner-stats-empty">Aucune donnée</p></div>';
@@ -752,7 +778,7 @@ function renderYearChart(items) {
   const max = Math.max(...sorted.map(i => i.count));
   const cols = sorted.map((item, idx) => {
     const h = Math.max(6, Math.round((item.count / max) * YEAR_CHART_MAX_HEIGHT));
-    const color = YEAR_CHART_COLORS[idx % YEAR_CHART_COLORS.length];
+    const color = CHART_COLORS[idx % CHART_COLORS.length];
     const label = `${item.count} livre${item.count > 1 ? 's' : ''} en ${item.year}`;
     return `
       <div class="year-chart-col" title="${escapeHtml(label)}">
@@ -773,7 +799,7 @@ function renderOwnerCard(owner) {
         <h3>${escapeHtml(owner.name)}</h3>
         <span class="owner-card-total">${owner.total} livre${owner.total > 1 ? 's' : ''}</span>
       </div>
-      ${renderBarSection('Par genre', owner.byGenre, 6)}
+      ${renderGenreDonut(owner.byGenre)}
       ${renderYearChart(owner.byYear)}
     </div>`;
 }
