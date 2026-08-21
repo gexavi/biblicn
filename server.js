@@ -508,10 +508,10 @@ app.get('/api/books', (req, res) => {
   let query = 'SELECT * FROM books WHERE 1=1';
   const params = [];
 
-  // Par défaut on ne montre que les livres possédés (pas la liste de souhaits),
-  // pour ne jamais mélanger les deux vues par accident.
+  // Par défaut on ne montre que les livres possédés (pas la liste de souhaits
+  // ni les revendus), pour ne jamais mélanger les vues par accident.
   query += ' AND status = ?';
-  params.push(status === 'souhaite' ? 'souhaite' : 'possede');
+  params.push(normalizeStatus(status));
 
   if (q) {
     query += ' AND (title LIKE ? OR author LIKE ? OR isbn LIKE ?)';
@@ -581,7 +581,7 @@ app.post('/api/books', async (req, res) => {
     read_date: b.read_date || null,
     publisher: b.publisher || '',
     owner: b.owner || '',
-    status: b.status === 'souhaite' ? 'souhaite' : 'possede'
+    status: normalizeStatus(b.status)
   });
   const bookId = info.lastInsertRowid;
 
@@ -632,7 +632,7 @@ app.put('/api/books/:id', async (req, res) => {
     read_date: b.read_date || null,
     publisher: b.publisher || '',
     owner: b.owner || '',
-    status: b.status === 'souhaite' ? 'souhaite' : 'possede'
+    status: normalizeStatus(b.status)
   });
   const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
   res.json(updated);
@@ -648,7 +648,7 @@ app.delete('/api/books/:id', (req, res) => {
 // Liste des genres distincts (les livres peuvent avoir plusieurs genres
 // séparés par des virgules, ex. "Fantasy, Aventure" -> on les éclate ici).
 app.get('/api/genres', (req, res) => {
-  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const status = normalizeStatus(req.query.status);
   const rows = db.prepare("SELECT genre FROM books WHERE status = ? AND genre IS NOT NULL AND genre != ''").all(status);
   const set = new Set();
   for (const row of rows) {
@@ -659,7 +659,7 @@ app.get('/api/genres', (req, res) => {
 
 // Liste des éditeurs distincts.
 app.get('/api/publishers', (req, res) => {
-  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const status = normalizeStatus(req.query.status);
   const rows = db.prepare("SELECT DISTINCT publisher FROM books WHERE status = ? AND publisher IS NOT NULL AND publisher != '' ORDER BY publisher COLLATE NOCASE").all(status);
   res.json(rows.map(r => r.publisher));
 });
@@ -667,7 +667,7 @@ app.get('/api/publishers', (req, res) => {
 // Liste des propriétaires distincts (comme le genre, plusieurs noms peuvent
 // être séparés par des virgules pour un livre partagé entre plusieurs personnes).
 app.get('/api/owners', (req, res) => {
-  const status = req.query.status === 'souhaite' ? 'souhaite' : 'possede';
+  const status = normalizeStatus(req.query.status);
   const rows = db.prepare("SELECT owner FROM books WHERE status = ? AND owner IS NOT NULL AND owner != ''").all(status);
   const set = new Set();
   for (const row of rows) {
@@ -733,6 +733,15 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
     results
   });
 });
+
+// Statuts valides pour la fiche d'un livre : 'possede' (bibliothèque),
+// 'souhaite' (liste de souhaits), 'revendu' (n'apparaît plus dans les listes
+// possédées ni dans les statistiques de collection, mais reste compté dans
+// l'historique de lecture des propriétaires — voir /api/stats/owners).
+const VALID_STATUSES = ['possede', 'souhaite', 'revendu'];
+function normalizeStatus(raw) {
+  return VALID_STATUSES.includes(raw) ? raw : 'possede';
+}
 
 // Types valides pour la fiche d'un livre.
 const VALID_TYPES = ['roman', 'bd', 'manga', 'essai', 'autre'];
@@ -821,7 +830,12 @@ app.post('/api/covers/localize-all', async (req, res) => {
 // propriétaires (ex. "Papa, Fils") et plusieurs genres séparés par des
 // virgules ; chaque nom/genre compte pour lui-même, comme pour les filtres.
 app.get('/api/stats/owners', (req, res) => {
-  const rows = db.prepare("SELECT owner, genre, lu, read_date FROM books WHERE status = 'possede'").all();
+  // Un livre revendu (status='revendu') sort de la collection : il ne compte
+  // plus dans le total ni dans la répartition par genre. Mais l'avoir lu reste
+  // vrai même après l'avoir revendu, donc il continue de compter dans
+  // l'historique de lecture (byYear) — d'où l'inclusion des deux statuts ici,
+  // avec un filtre différent selon la statistique plus bas.
+  const rows = db.prepare("SELECT owner, genre, lu, read_date, status FROM books WHERE status IN ('possede', 'revendu')").all();
   const owners = new Map(); // nom -> { total, byGenre: Map, byYear: Map }
 
   const getOwnerEntry = (name) => {
@@ -838,8 +852,10 @@ app.get('/api/stats/owners', (req, res) => {
 
     for (const name of names) {
       const entry = getOwnerEntry(name);
-      entry.total++;
-      genres.forEach(g => bump(entry.byGenre, g));
+      if (row.status === 'possede') {
+        entry.total++;
+        genres.forEach(g => bump(entry.byGenre, g));
+      }
       if (year) bump(entry.byYear, year);
     }
   }

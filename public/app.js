@@ -129,16 +129,18 @@ function renderBookCard(book) {
   el.addEventListener('click', () => openEditModal(book));
 
   const isWishlist = book.status === 'souhaite';
+  const isSold = book.status === 'revendu';
   const noteHtml = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '<span></span>';
   const readDateHtml = book.lu && book.read_date ? ` <span class="book-read-date">le ${formatDateFr(book.read_date)}</span>` : '';
   const statusHtml = book.lu
     ? `<span class="book-status lu">✓ Lu${readDateHtml}</span>`
     : '<span class="book-status">Non lu</span>';
-  const lentHtml = book.lent_to
+  const lentHtml = !isSold && book.lent_to
     ? `<div class="book-lent">Prêté à ${escapeHtml(book.lent_to)}</div>`
     : '';
+  const ownerIcon = isWishlist ? '🎁' : isSold ? '📦' : '📚';
   const ownerHtml = book.owner
-    ? `<div class="book-owner">${isWishlist ? '🎁' : '📚'} ${escapeHtml(book.owner)}</div>`
+    ? `<div class="book-owner">${ownerIcon} ${escapeHtml(book.owner)}</div>`
     : '';
   const metaHtml = isWishlist
     ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
@@ -154,7 +156,7 @@ function renderBookCard(book) {
       </div>
       <p class="book-author">${escapeHtml(book.author || 'Auteur inconnu')}</p>
       ${book.genre ? `<p class="book-genre">${escapeHtml(book.genre)}</p>` : ''}
-      ${!isWishlist && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
+      ${!isWishlist && !isSold && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
       ${ownerHtml}
       ${lentHtml}
     </div>
@@ -236,6 +238,8 @@ function openAddModal() {
   modalTitle.textContent = currentStatus === 'souhaite' ? 'Ajouter à la liste de souhaits' : 'Ajouter un livre';
   deleteBtn.hidden = true;
   $('#markAcquiredBtn').hidden = true;
+  $('#markSoldBtn').hidden = true;
+  $('#unmarkSoldBtn').hidden = true;
   $('#secondhandLinks').hidden = true;
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
@@ -262,9 +266,12 @@ function openEditModal(book) {
   $('#isbnInput').value = book.isbn || '';
   isbnStatus.textContent = '';
   isbnStatus.className = 'isbn-status';
-  modalTitle.textContent = book.status === 'souhaite' ? 'Modifier le souhait' : 'Modifier le livre';
+  modalTitle.textContent = book.status === 'souhaite' ? 'Modifier le souhait'
+    : book.status === 'revendu' ? 'Livre revendu' : 'Modifier le livre';
   deleteBtn.hidden = false;
   $('#markAcquiredBtn').hidden = book.status !== 'souhaite';
+  $('#markSoldBtn').hidden = book.status !== 'possede';
+  $('#unmarkSoldBtn').hidden = book.status !== 'revendu';
   updateSecondhandLinks(book);
   modalBackdrop.hidden = false;
   toggleReadDateVisibility();
@@ -415,7 +422,7 @@ bookForm.addEventListener('submit', async (e) => {
     owner: $('#fieldOwner').value.trim(),
     isbn: $('#fieldIsbn').value.trim(),
     cover_url: $('#fieldCover').value.trim(),
-    status: $('#fieldStatus').value === 'souhaite' ? 'souhaite' : 'possede'
+    status: ['souhaite', 'revendu'].includes($('#fieldStatus').value) ? $('#fieldStatus').value : 'possede'
   };
 
   const url = id ? `/api/books/${id}` : '/api/books';
@@ -449,14 +456,14 @@ deleteBtn.addEventListener('click', async () => {
   }
 });
 
-$('#markAcquiredBtn').addEventListener('click', async () => {
+async function setBookStatus(status, errorMessage) {
   const id = $('#bookId').value;
   if (!id) return;
-  $('#fieldStatus').value = 'possede';
+  $('#fieldStatus').value = status;
   const res = await fetch(`/api/books/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'possede' })
+    body: JSON.stringify({ status })
   });
   if (res.ok) {
     closeModal();
@@ -464,8 +471,20 @@ $('#markAcquiredBtn').addEventListener('click', async () => {
     await loadStats();
     refreshFilterOptions();
   } else {
-    alert('Erreur lors du passage en bibliothèque.');
+    alert(errorMessage);
   }
+}
+
+$('#markAcquiredBtn').addEventListener('click', () => {
+  setBookStatus('possede', 'Erreur lors du passage en bibliothèque.');
+});
+
+$('#markSoldBtn').addEventListener('click', () => {
+  setBookStatus('revendu', 'Erreur lors du passage en revendu.');
+});
+
+$('#unmarkSoldBtn').addEventListener('click', () => {
+  setBookStatus('possede', 'Erreur lors du retour en bibliothèque.');
 });
 
 // ---------- Filtres ----------
@@ -494,17 +513,24 @@ $('#viewGridBtn').addEventListener('click', () => setViewMode('grid'));
 $('#viewListBtn').addEventListener('click', () => setViewMode('list'));
 setViewMode(viewMode);
 
-// ---------- Bibliothèque / Liste de souhaits ----------
+// ---------- Bibliothèque / Liste de souhaits / Revendus ----------
 function setStatus(status) {
   currentStatus = status;
   $('#viewLibraryBtn').classList.toggle('active', status === 'possede');
   $('#viewWishlistBtn').classList.toggle('active', status === 'souhaite');
+  $('#viewSoldBtn').classList.toggle('active', status === 'revendu');
   $('#openAddBtn').textContent = status === 'souhaite' ? '+ Ajouter un souhait' : '+ Ajouter un livre';
+  // Un livre revendu ne se crée pas directement : on part toujours d'un livre
+  // déjà en bibliothèque, marqué revendu depuis sa fiche.
+  $('#openAddBtn').hidden = status === 'revendu';
+  $('#emptyStateDefault').hidden = status === 'revendu';
+  $('#emptyStateSold').hidden = status !== 'revendu';
   loadBooks();
   refreshFilterOptions();
 }
 $('#viewLibraryBtn').addEventListener('click', () => setStatus('possede'));
 $('#viewWishlistBtn').addEventListener('click', () => setStatus('souhaite'));
+$('#viewSoldBtn').addEventListener('click', () => setStatus('revendu'));
 
 // ---------- Import en masse ----------
 const bulkModalBackdrop = $('#bulkModalBackdrop');

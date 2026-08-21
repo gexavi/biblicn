@@ -24,9 +24,10 @@
     <span class="brand-mark">§</span>
     <h1>Ma Bibliothèque</h1>
   </div>
-  <div class="status-toggle" role="group" aria-label="Bibliothèque ou liste de souhaits">
+  <div class="status-toggle" role="group" aria-label="Bibliothèque, liste de souhaits ou revendus">
     <button class="status-btn active" id="viewLibraryBtn" type="button">📚 Ma bibliothèque</button>
     <button class="status-btn" id="viewWishlistBtn" type="button">🎁 Liste de souhaits</button>
+    <button class="status-btn" id="viewSoldBtn" type="button">📦 Revendus</button>
   </div>
   <div class="stats" id="stats">
     <div class="stat"><strong id="statTotal">0</strong><span>livres</span></div>
@@ -89,7 +90,8 @@
 <main>
   <div id="shelf" class="shelf"></div>
   <p id="emptyState" class="empty-state" hidden>
-    Votre étagère est vide. <button class="link-btn" id="emptyAddBtn">Ajoutez votre premier livre</button>.
+    <span id="emptyStateDefault">Votre étagère est vide. <button class="link-btn" id="emptyAddBtn">Ajoutez votre premier livre</button>.</span>
+    <span id="emptyStateSold" hidden>Aucun livre revendu pour le moment.</span>
   </p>
 </main>
 
@@ -185,6 +187,8 @@
         <button type="button" class="btn btn-danger" id="deleteBtn" hidden>Supprimer</button>
         <div class="modal-actions-right">
           <button type="button" class="btn btn-secondary" id="markAcquiredBtn" hidden>🎁→📚 Marquer comme acquis</button>
+          <button type="button" class="btn btn-secondary" id="markSoldBtn" hidden>📚→📦 Marquer comme revendu</button>
+          <button type="button" class="btn btn-secondary" id="unmarkSoldBtn" hidden>📦→📚 Remettre dans la bibliothèque</button>
           <button type="button" class="btn btn-ghost" id="cancelBtn">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
