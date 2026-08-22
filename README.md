@@ -62,6 +62,20 @@ AUTH_PASSWORD=votre_mot_de_passe
 
 Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
 
+## Réglages avancés (optionnels)
+
+En plus de `AUTH_USERNAME`/`AUTH_PASSWORD`, quelques variables d'environnement optionnelles (valeur par défaut appliquée si absentes) permettent d'ajuster le comportement de l'application sans toucher au code. Voir le fichier `.env.example` pour la liste complète avec description :
+
+| Variable | Défaut | Effet |
+|---|---|---|
+| `SESSION_DURATION_DAYS` | `30` | Durée de validité d'une session avant reconnexion |
+| `COVER_MAX_WIDTH` | `500` | Largeur max (px) des couvertures mises en cache |
+| `COVER_JPEG_QUALITY` | `82` | Qualité de compression JPEG des couvertures |
+| `BACKUP_INTERVAL_DAYS` | `15` | Fréquence de la sauvegarde automatique |
+| `BACKUP_KEEP` | `6` | Nombre de sauvegardes automatiques conservées |
+
+Ajoutez-les au fichier `.env` (ligne de commande) ou aux **Environment variables** de la stack (Portainer), comme pour `AUTH_USERNAME`/`AUTH_PASSWORD`.
+
 ## Changer le port
 
 L'application est configurée pour être accessible sur le port **7000**. Si besoin, modifiez `docker-compose.yml` :

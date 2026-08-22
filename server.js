@@ -22,7 +22,7 @@ if (!AUTH_USERNAME || !AUTH_PASSWORD) {
   process.exit(1);
 }
 const SESSION_COOKIE = 'bibli_session';
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
+const SESSION_DURATION_MS = (Number(process.env.SESSION_DURATION_DAYS) || 30) * 24 * 60 * 60 * 1000;
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -457,8 +457,8 @@ async function lookupIsbn(isbn) {
 // la compresse en JPEG, et la stocke dans data/covers/{id}.jpg — servie
 // ensuite localement via /covers/{id}.jpg, sans dépendre d'aucune source
 // externe pour l'affichage au quotidien.
-const COVER_MAX_WIDTH = 500;
-const COVER_JPEG_QUALITY = 82;
+const COVER_MAX_WIDTH = Number(process.env.COVER_MAX_WIDTH) || 500;
+const COVER_JPEG_QUALITY = Number(process.env.COVER_JPEG_QUALITY) || 82;
 
 async function localizeCover(bookId, remoteUrl) {
   if (!remoteUrl || remoteUrl.startsWith('/covers/')) return remoteUrl || null;
@@ -886,8 +886,8 @@ app.get('/api/stats', (req, res) => {
 // .db en WAL actif peut capturer un état incohérent en cas d'écriture
 // concurrente, alors que db.backup() produit un instantané cohérent.
 const BACKUP_DIR = path.join(DATA_DIR, 'backup');
-const BACKUP_INTERVAL_MS = 15 * 24 * 60 * 60 * 1000; // 15 jours
-const BACKUP_KEEP = 6; // ~3 mois d'historique à ce rythme
+const BACKUP_INTERVAL_MS = (Number(process.env.BACKUP_INTERVAL_DAYS) || 15) * 24 * 60 * 60 * 1000;
+const BACKUP_KEEP = Number(process.env.BACKUP_KEEP) || 6; // ~3 mois d'historique à raison d'une sauvegarde tous les 15 jours par défaut
 
 function pruneOldBackups() {
   const dirs = fs.readdirSync(BACKUP_DIR)

@@ -12,6 +12,12 @@ services:
       # .env à côté de ce docker-compose.yml) — ne les codez pas ici en dur.
       - AUTH_USERNAME=${AUTH_USERNAME:?AUTH_USERNAME manquant}
       - AUTH_PASSWORD=${AUTH_PASSWORD:?AUTH_PASSWORD manquant}
+      # Réglages optionnels (valeurs par défaut si absents) — voir .env.example.
+      - SESSION_DURATION_DAYS=${SESSION_DURATION_DAYS:-30}
+      - COVER_MAX_WIDTH=${COVER_MAX_WIDTH:-500}
+      - COVER_JPEG_QUALITY=${COVER_JPEG_QUALITY:-82}
+      - BACKUP_INTERVAL_DAYS=${BACKUP_INTERVAL_DAYS:-15}
+      - BACKUP_KEEP=${BACKUP_KEEP:-6}
     volumes:
       # Chemin absolu obligatoire (Portainer gère mal les chemins relatifs
       # comme ./data) — adaptez si votre dossier NAS est différent.
