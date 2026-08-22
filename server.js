@@ -384,9 +384,34 @@ async function lookupBnf(isbn) {
   };
 }
 
+// Fusionne les réponses déjà arrivées (title/author/genre/publisher/cover_url),
+// en gardant la première valeur non vide rencontrée dans l'ordre du tableau.
+function mergeIsbnResults(results) {
+  const firstNonEmpty = (key) => {
+    for (const r of results) {
+      if (r && r[key] && String(r[key]).trim()) return r[key];
+    }
+    return '';
+  };
+  return {
+    title: firstNonEmpty('title'),
+    author: firstNonEmpty('author'),
+    genre: firstNonEmpty('genre'),
+    publisher: firstNonEmpty('publisher'),
+    cover_url: firstNonEmpty('cover_url') || null
+  };
+}
+
 // Interroge Open Library + Google Books, sur la forme ISBN-10 ET ISBN-13,
 // et fusionne tous les résultats non vides (l'auteur et la couverture sont
 // souvent absents d'une des quatre réponses selon la source et le format).
+//
+// Sortie anticipée : dès qu'une fiche exploitable (titre + auteur + couverture)
+// peut être formée à partir des réponses déjà arrivées, on répond tout de
+// suite plutôt que d'attendre les sources restantes — souvent les plus lentes
+// ou les moins fiables (BnF, Amazon, Geobib), qui n'apportent alors qu'une
+// confirmation d'un champ déjà rempli. Les appels encore en cours continuent
+// en arrière-plan (déjà protégés par un .catch) mais leur résultat est ignoré.
 async function lookupIsbn(isbn) {
   const variants = isbnVariants(isbn);
   const calls = [];
@@ -402,28 +427,33 @@ async function lookupIsbn(isbn) {
   for (const v of variants) {
     calls.push(lookupGeobibCover(v).catch(err => { console.error(`Erreur Geobib (${v}):`, err.message); return null; }));
   }
-  const results = (await Promise.all(calls)).filter(Boolean);
 
-  if (!results.length) {
+  const arrived = [];
+  const { merged, allSettled } = await new Promise((resolveOnce) => {
+    let settledCount = 0;
+    calls.forEach((call) => {
+      call.then((r) => {
+        arrived.push(r);
+        settledCount++;
+        const merged = mergeIsbnResults(arrived);
+        if ((merged.title && merged.author && merged.cover_url) || settledCount === calls.length) {
+          resolveOnce({ merged, allSettled: settledCount === calls.length });
+        }
+      });
+    });
+  });
+
+  if (!merged.title) {
     console.error(`ISBN ${isbn} (variantes testées : ${variants.join(', ')}) : aucune source n'a répondu.`);
     return null;
   }
 
-  const firstNonEmpty = (key) => {
-    for (const r of results) {
-      if (r[key] && String(r[key]).trim()) return r[key];
-    }
-    return '';
-  };
-
-  const title = firstNonEmpty('title');
-  if (!title) return null;
-
-  let cover_url = firstNonEmpty('cover_url');
-  if (!cover_url) {
+  let cover_url = merged.cover_url;
+  if (!cover_url && allSettled) {
     // Open Library renvoie une petite image "introuvable" (~800 octets) plutôt
     // qu'une erreur HTTP quand aucune couverture n'existe pour cet ISBN : on
-    // vérifie donc la taille réelle avant de proposer l'URL de repli.
+    // vérifie donc la taille réelle avant de proposer l'URL de repli. Inutile
+    // si la sortie était anticipée : une couverture a alors déjà été trouvée.
     const fallbackUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
     try {
       const headRes = await fetch(fallbackUrl, { method: 'GET', timeout: 6000 });
@@ -434,15 +464,9 @@ async function lookupIsbn(isbn) {
     }
   }
 
-  const result = {
-    isbn,
-    title,
-    author: firstNonEmpty('author'),
-    genre: firstNonEmpty('genre'),
-    publisher: firstNonEmpty('publisher'),
-    cover_url: cover_url || null
-  };
-  console.log(`ISBN ${isbn} → ${results.length}/${calls.length} réponse(s) exploitable(s) | auteur="${result.author}" couverture=${result.cover_url ? 'trouvée' : 'aucune'}`);
+  const result = { isbn, ...merged, cover_url: cover_url || null };
+  const exploitable = arrived.filter(Boolean).length;
+  console.log(`ISBN ${isbn} → ${exploitable} source(s) exploitable(s) (${arrived.length}/${calls.length} arrivée(s)${allSettled ? '' : ', sortie anticipée'}) | auteur="${result.author}" couverture=${result.cover_url ? 'trouvée' : 'aucune'}`);
   return result;
 }
 
