@@ -141,6 +141,14 @@
           <input type="text" id="fieldGenre" placeholder="Fantasy, policier…">
         </label>
         <label class="field">
+          <span>Série</span>
+          <input type="text" id="fieldSeries" placeholder="Le Trône de fer…">
+        </label>
+        <label class="field">
+          <span>N° dans la série</span>
+          <input type="text" id="fieldSeriesNumber" placeholder="1, 2, 3.5…">
+        </label>
+        <label class="field">
           <span>Éditeur</span>
           <input type="text" id="fieldPublisher" placeholder="Gallimard, Bragelonne…">
         </label>
@@ -241,7 +249,7 @@
     <div class="tab-panel" id="tabCsv" hidden>
       <p class="tab-help">
         Colonnes attendues (première ligne = en-têtes) :
-        <code>title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn</code><br>
+        <code>title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn, series, series_number</code><br>
         Seule la colonne <code>title</code> est obligatoire. <code>type</code> = roman, bd, manga, essai ou autre. <code>lu</code> = oui/non.
         Séparateur virgule ou point-virgule accepté (détecté automatiquement — utile pour les exports Excel en français).
       </p>

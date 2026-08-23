@@ -69,6 +69,14 @@ if (!existingColumns.includes('status')) {
   db.exec("ALTER TABLE books ADD COLUMN status TEXT DEFAULT 'possede'");
   db.exec("UPDATE books SET status = 'possede' WHERE status IS NULL");
 }
+if (!existingColumns.includes('series')) {
+  db.exec('ALTER TABLE books ADD COLUMN series TEXT');
+}
+if (!existingColumns.includes('series_number')) {
+  // Stocké en texte plutôt qu'en entier : certaines séries numérotent des
+  // hors-séries ou demi-tomes ("3.5", "HS1"), pas seulement des entiers.
+  db.exec('ALTER TABLE books ADD COLUMN series_number TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
@@ -588,8 +596,8 @@ app.post('/api/books', async (req, res) => {
   const b = req.body;
   if (!b.title) return res.status(400).json({ error: 'Le titre est requis' });
   const stmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status, series, series_number)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status, @series, @series_number)
   `);
   const info = stmt.run({
     isbn: b.isbn || null,
@@ -605,7 +613,9 @@ app.post('/api/books', async (req, res) => {
     read_date: b.read_date || null,
     publisher: b.publisher || '',
     owner: b.owner || '',
-    status: normalizeStatus(b.status)
+    status: normalizeStatus(b.status),
+    series: b.series || '',
+    series_number: b.series_number || ''
   });
   const bookId = info.lastInsertRowid;
 
@@ -639,7 +649,7 @@ app.put('/api/books/:id', async (req, res) => {
   db.prepare(`
     UPDATE books SET isbn=@isbn, title=@title, author=@author, type=@type, genre=@genre,
       lu=@lu, note=@note, location=@location, lent_to=@lent_to, cover_url=@cover_url, read_date=@read_date,
-      publisher=@publisher, owner=@owner, status=@status
+      publisher=@publisher, owner=@owner, status=@status, series=@series, series_number=@series_number
     WHERE id=@id
   `).run({
     id: req.params.id,
@@ -656,7 +666,9 @@ app.put('/api/books/:id', async (req, res) => {
     read_date: b.read_date || null,
     publisher: b.publisher || '',
     owner: b.owner || '',
-    status: normalizeStatus(b.status)
+    status: normalizeStatus(b.status),
+    series: b.series || '',
+    series_number: b.series_number || ''
   });
   const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
   res.json(updated);
@@ -707,8 +719,8 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
   const isbns = Array.isArray(req.body.isbns) ? req.body.isbns : [];
   const results = [];
   const insertStmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status, series, series_number)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status, @series, @series_number)
   `);
   const defaults = req.body.defaults || {};
   const status = defaults.status === 'souhaite' ? 'souhaite' : 'possede';
@@ -736,7 +748,9 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
         read_date: null,
         publisher: data.publisher || '',
         owner: defaults.owner || '',
-        status
+        status,
+        series: '',
+        series_number: ''
       });
       const bookId = info.lastInsertRowid;
       if (data.cover_url) {
@@ -780,8 +794,8 @@ function normalizeType(raw) {
 app.post('/api/books/bulk', async (req, res) => {
   const books = Array.isArray(req.body.books) ? req.body.books : [];
   const insertStmt = db.prepare(`
-    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status)
-    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status)
+    INSERT INTO books (isbn, title, author, type, genre, lu, note, location, lent_to, cover_url, read_date, publisher, owner, status, series, series_number)
+    VALUES (@isbn, @title, @author, @type, @genre, @lu, @note, @location, @lent_to, @cover_url, @read_date, @publisher, @owner, @status, @series, @series_number)
   `);
   let added = 0;
   const errors = [];
@@ -807,7 +821,9 @@ app.post('/api/books/bulk', async (req, res) => {
         read_date: b.read_date || null,
         publisher: b.publisher || '',
         owner: b.owner || '',
-        status: String(b.status || '').toLowerCase() === 'souhaite' ? 'souhaite' : 'possede'
+        status: String(b.status || '').toLowerCase() === 'souhaite' ? 'souhaite' : 'possede',
+        series: b.series || '',
+        series_number: b.series_number || ''
       });
       added++;
       if (b.cover_url) insertedIdsWithCover.push({ id: info.lastInsertRowid, cover_url: b.cover_url });

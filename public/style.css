@@ -281,8 +281,10 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 }
 .shelf.list-view .book-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .book-author { font-size: 13px; color: var(--ink-soft); margin: 0; }
+.book-series { font-size: 12px; color: var(--ink-soft); margin: 0; }
 .book-genre { font-size: 12px; color: var(--ink-soft); font-style: italic; margin: 0; }
 .shelf.list-view .book-genre,
+.shelf.list-view .book-series,
 .shelf.list-view .book-location,
 .shelf.list-view .book-owner { display: none; }
 

@@ -145,6 +145,9 @@ function renderBookCard(book) {
   const metaHtml = isWishlist
     ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
     : `${statusHtml}${noteHtml}`;
+  const seriesHtml = book.series
+    ? `<p class="book-series">📖 ${escapeHtml(book.series)}${book.series_number ? ` #${escapeHtml(book.series_number)}` : ''}</p>`
+    : '';
 
   el.innerHTML = `
     <img class="book-cover" src="${escapeHtml(coverSrc(book))}" alt="" loading="lazy"
@@ -155,6 +158,7 @@ function renderBookCard(book) {
         <span class="book-type-tag">${typeLabel(book.type)}</span>
       </div>
       <p class="book-author">${escapeHtml(book.author || 'Auteur inconnu')}</p>
+      ${seriesHtml}
       ${book.genre ? `<p class="book-genre">${escapeHtml(book.genre)}</p>` : ''}
       ${!isWishlist && !isSold && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
       ${ownerHtml}
@@ -229,6 +233,8 @@ function openAddModal() {
   $('#fieldCover').value = '';
   $('#fieldReadDate').value = '';
   $('#fieldPublisher').value = '';
+  $('#fieldSeries').value = '';
+  $('#fieldSeriesNumber').value = '';
   $('#fieldOwner').value = '';
   $('#fieldStatus').value = currentStatus;
   $('#isbnInput').value = '';
@@ -253,6 +259,8 @@ function openEditModal(book) {
   $('#fieldAuthor').value = book.author || '';
   $('#fieldType').value = book.type || 'roman';
   $('#fieldGenre').value = book.genre || '';
+  $('#fieldSeries').value = book.series || '';
+  $('#fieldSeriesNumber').value = book.series_number || '';
   $('#fieldPublisher').value = book.publisher || '';
   $('#fieldNote').value = book.note != null ? book.note : '';
   $('#fieldLu').checked = !!book.lu;
@@ -413,6 +421,8 @@ bookForm.addEventListener('submit', async (e) => {
     author: $('#fieldAuthor').value.trim(),
     type: $('#fieldType').value,
     genre: $('#fieldGenre').value.trim(),
+    series: $('#fieldSeries').value.trim(),
+    series_number: $('#fieldSeriesNumber').value.trim(),
     publisher: $('#fieldPublisher').value.trim(),
     note: $('#fieldNote').value === '' ? null : Number($('#fieldNote').value),
     lu: $('#fieldLu').checked,
@@ -713,9 +723,9 @@ $('#runBulkCsvBtn').addEventListener('click', async () => {
 });
 
 $('#downloadTemplateBtn').addEventListener('click', () => {
-  const csv = 'title,author,type,genre,publisher,lu,note,location,lent_to,owner,isbn\n'
-    + 'Dune,Frank Herbert,roman,Science-fiction,Robert Laffont,oui,18,Salon,,Papa,9782070368228\n'
-    + 'Watchmen,Alan Moore,bd,Super-héros,Urban Comics,non,,Bureau,Julie,Maman,9782205057114\n';
+  const csv = 'title,author,type,genre,publisher,lu,note,location,lent_to,owner,isbn,series,series_number\n'
+    + 'Dune,Frank Herbert,roman,Science-fiction,Robert Laffont,oui,18,Salon,,Papa,9782070368228,Dune,1\n'
+    + 'Watchmen,Alan Moore,bd,Super-héros,Urban Comics,non,,Bureau,Julie,Maman,9782205057114,,\n';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

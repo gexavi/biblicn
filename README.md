@@ -1,6 +1,6 @@
 # Ma Bibliothèque
 
-Application auto-hébergée de gestion de bibliothèque personnelle : recherche de livres par ISBN, fiches avec titre, auteur, éditeur, type (roman/BD/manga/essai/autre), genre, lecture (avec date), note sur 20, emplacement de rangement, prêt et propriétaire. Interface web responsive, utilisable sur mobile ou navigateur.
+Application auto-hébergée de gestion de bibliothèque personnelle : recherche de livres par ISBN, fiches avec titre, auteur, éditeur, type (roman/BD/manga/essai/autre), genre, série (avec numéro de tome), lecture (avec date), note sur 20, emplacement de rangement, prêt et propriétaire. Interface web responsive, utilisable sur mobile ou navigateur.
 
 ## Fonctionnement
 
@@ -103,7 +103,7 @@ npm start
 Le bouton **Import en masse** (en haut de l'écran) propose deux méthodes :
 
 - **Liste d'ISBN** : collez un ISBN par ligne (avec ou sans tirets). Chaque livre est recherché automatiquement comme pour l'ajout unitaire, avec un type, un rangement et un propriétaire par défaut appliqués à tous. Les ISBN introuvables sont listés à part, sans bloquer les autres.
-- **Fichier CSV** : importez un fichier avec les colonnes `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn` (première ligne = en-têtes, seule `title` est obligatoire ; `type` = `roman`, `bd`, `manga`, `essai` ou `autre` ; `lu` = `oui`/`non`). Le séparateur (virgule ou point-virgule) est détecté automatiquement — utile pour les exports Excel en français, qui utilisent le point-virgule par défaut. Un bouton **Télécharger un modèle CSV** dans la modale fournit un exemple prêt à remplir dans un tableur. Pratique pour ressaisir un catalogue existant (export Excel, Babelio, Goodreads reformaté, etc.) sans dépendre de la recherche par ISBN.
+- **Fichier CSV** : importez un fichier avec les colonnes `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn, series, series_number` (première ligne = en-têtes, seule `title` est obligatoire ; `type` = `roman`, `bd`, `manga`, `essai` ou `autre` ; `lu` = `oui`/`non`). Le séparateur (virgule ou point-virgule) est détecté automatiquement — utile pour les exports Excel en français, qui utilisent le point-virgule par défaut. Un bouton **Télécharger un modèle CSV** dans la modale fournit un exemple prêt à remplir dans un tableur. Pratique pour ressaisir un catalogue existant (export Excel, Babelio, Goodreads reformaté, etc.) sans dépendre de la recherche par ISBN.
 
 ## Interface
 
@@ -124,6 +124,7 @@ Le bouton **Import en masse** (en haut de l'écran) propose deux méthodes :
   - Le nouveau livre ajouté dépend de la vue active au moment de l'ajout : cliquez sur 🎁 avant d'ajouter pour l'envoyer dans la liste de souhaits, ou sur 📚 pour l'ajouter directement à votre bibliothèque.
 - **Revendus** : quand vous revendez un livre, le bouton **« 📚→📦 Marquer comme revendu »** dans sa fiche détaillée le retire de votre bibliothèque (et des statistiques de collection — total, répartition par genre) sans le supprimer. Il reste consultable dans l'onglet 📦 Revendus, aux côtés de 📚 Ma bibliothèque et 🎁 Liste de souhaits, et un bouton **« 📦→📚 Remettre dans la bibliothèque »** permet d'annuler à tout moment. Les statistiques de lecture par année (dans 📊 Statistiques) continuent de le compter : le fait d'avoir lu ce livre reste acquis même après l'avoir revendu.
 - **Éditeur** : champ dans la fiche du livre, rempli automatiquement lors de la recherche ISBN quand l'information est disponible (Open Library, Google Books ou BnF). Un filtre dédié dans la barre d'outils liste tous les éditeurs présents dans la bibliothèque.
+- **Série** : deux champs libres dans la fiche du livre — le nom de la série et le numéro du tome (au format texte, pour couvrir aussi les hors-séries ou demi-tomes comme « 3.5 »). Aucune des sources de recherche ISBN ne fournit cette information de façon fiable, donc ces champs se remplissent manuellement. Quand renseigné, le nom de la série s'affiche sur la carte du livre (vue grille), avec le numéro entre parenthèses.
 - **Appartient à** : champ pour indiquer à qui appartient le livre (utile pour une bibliothèque partagée entre plusieurs personnes d'un même foyer — peut contenir plusieurs noms séparés par des virgules pour un livre en copropriété). S'affiche en tag 📚 sur la carte (vue grille) et dispose de son propre filtre. C'est un champ distinct de « Prêté à », qui sert lui à noter un prêt temporaire à quelqu'un d'extérieur.
 - **Types de livre** : Roman, BD, Manga, Essai, Autre — disponibles partout où le type est choisi (fiche, import CSV, import ISBN en masse, filtre).
 - **Scanner de code-barres** : dans la fiche d'ajout d'un livre, le bouton 📷 à côté du champ ISBN ouvre la caméra du téléphone pour scanner directement le code-barres (EAN-13) au dos du livre. L'ISBN détecté est rempli automatiquement et la recherche se lance toute seule.
