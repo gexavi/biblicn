@@ -59,6 +59,7 @@ async function loadBooks() {
   const lu = $('#filterLu').value;
   const genre = $('#filterGenre').value;
   const publisher = $('#filterPublisher').value;
+  const series = $('#filterSeries').value;
   const owner = $('#filterOwner').value;
   const minNote = $('#filterNote').value;
   const sort = $('#sortBy').value;
@@ -68,6 +69,7 @@ async function loadBooks() {
   if (lu !== '') params.set('lu', lu);
   if (genre) params.set('genre', genre);
   if (publisher) params.set('publisher', publisher);
+  if (series) params.set('series', series);
   if (owner) params.set('owner', owner);
   if (minNote) params.set('minNote', minNote);
   if (sort) params.set('sort', sort);
@@ -97,6 +99,16 @@ async function loadPublisherOptions() {
   if (publishers.includes(current)) select.value = current;
 }
 
+async function loadSeriesOptions() {
+  const res = await fetch('/api/series?status=' + currentStatus);
+  const series = await res.json();
+  const select = $('#filterSeries');
+  const current = select.value;
+  select.innerHTML = '<option value="">Toutes les séries</option>' +
+    series.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (series.includes(current)) select.value = current;
+}
+
 async function loadOwnerOptions() {
   const res = await fetch('/api/owners?status=' + currentStatus);
   const owners = await res.json();
@@ -110,6 +122,7 @@ async function loadOwnerOptions() {
 async function refreshFilterOptions() {
   loadGenreOptions();
   loadPublisherOptions();
+  loadSeriesOptions();
   loadOwnerOptions();
 }
 
@@ -507,6 +520,7 @@ $('#filterType').addEventListener('change', loadBooks);
 $('#filterLu').addEventListener('change', loadBooks);
 $('#filterGenre').addEventListener('change', loadBooks);
 $('#filterPublisher').addEventListener('change', loadBooks);
+$('#filterSeries').addEventListener('change', loadBooks);
 $('#filterOwner').addEventListener('change', loadBooks);
 $('#filterNote').addEventListener('change', loadBooks);
 $('#sortBy').addEventListener('change', loadBooks);

@@ -536,7 +536,7 @@ app.get('/api/isbn/:isbn', async (req, res) => {
 
 // ---------- CRUD Livres ----------
 app.get('/api/books', (req, res) => {
-  const { q, type, genre, lu, sort, publisher, owner, status, minNote } = req.query;
+  const { q, type, genre, lu, sort, publisher, owner, status, minNote, series } = req.query;
   let query = 'SELECT * FROM books WHERE 1=1';
   const params = [];
 
@@ -560,6 +560,10 @@ app.get('/api/books', (req, res) => {
   if (publisher) {
     query += ' AND publisher = ?';
     params.push(publisher);
+  }
+  if (series) {
+    query += ' AND series = ?';
+    params.push(series);
   }
   if (owner) {
     query += ' AND owner LIKE ?';
@@ -698,6 +702,13 @@ app.get('/api/publishers', (req, res) => {
   const status = normalizeStatus(req.query.status);
   const rows = db.prepare("SELECT DISTINCT publisher FROM books WHERE status = ? AND publisher IS NOT NULL AND publisher != '' ORDER BY publisher COLLATE NOCASE").all(status);
   res.json(rows.map(r => r.publisher));
+});
+
+// Liste des séries distinctes.
+app.get('/api/series', (req, res) => {
+  const status = normalizeStatus(req.query.status);
+  const rows = db.prepare("SELECT DISTINCT series FROM books WHERE status = ? AND series IS NOT NULL AND series != '' ORDER BY series COLLATE NOCASE").all(status);
+  res.json(rows.map(r => r.series));
 });
 
 // Liste des propriétaires distincts (comme le genre, plusieurs noms peuvent
