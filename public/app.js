@@ -170,7 +170,9 @@ function renderBookCard(book) {
         <p class="book-title">${escapeHtml(book.title)}</p>
         <span class="book-type-tag">${typeLabel(book.type)}</span>
       </div>
-      <p class="book-author">${escapeHtml(book.author || 'Auteur inconnu')}</p>
+      ${book.author
+        ? `<p class="book-author book-author-link">${escapeHtml(book.author)}</p>`
+        : `<p class="book-author">Auteur inconnu</p>`}
       ${seriesHtml}
       ${book.genre ? `<p class="book-genre">${escapeHtml(book.genre)}</p>` : ''}
       ${!isWishlist && !isSold && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
@@ -189,7 +191,19 @@ function renderBookCard(book) {
     });
   }
 
+  if (book.author) {
+    el.querySelector('.book-author-link').addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterByAuthor(book.author);
+    });
+  }
+
   return el;
+}
+
+function filterByAuthor(author) {
+  $('#searchInput').value = author;
+  loadBooks();
 }
 
 async function quickMarkAcquired(id) {
