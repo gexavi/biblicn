@@ -370,6 +370,18 @@ function extractAllXmlTags(xml, tag) {
   return out;
 }
 
+// La BnF fournit les auteurs au format bibliothécaire "Nom, Prénom" (ex.
+// "Herbert, Frank"), à l'inverse d'Open Library et Google Books qui donnent
+// déjà "Prénom Nom" — sans cette conversion, un livre trouvé via une source
+// puis l'autre selon l'ISBN se retrouve avec un format d'auteur incohérent
+// dans la bibliothèque. On ne coupe que sur la première virgule : un nom
+// composé après celle-ci (ex. "Saint-Exupéry, Antoine de") reste intact et
+// se retrouve simplement déplacé en tête ("Antoine de Saint-Exupéry").
+function bnfAuthorToDisplayName(creator) {
+  const m = creator.match(/^([^,]+),\s*(.+)$/);
+  return m ? `${m[2]} ${m[1]}`.trim() : creator;
+}
+
 async function lookupBnf(isbn) {
   const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&query=bib.isbn%20all%20%22${isbn}%22&recordSchema=dublincore&maximumRecords=1`;
   const res = await fetch(url, { timeout: 8000 });
@@ -385,7 +397,7 @@ async function lookupBnf(isbn) {
   return {
     isbn,
     title: titles[0].split(/[\/:]/)[0].trim(),
-    author: creators.slice(0, 2).join(', '),
+    author: creators.slice(0, 2).map(bnfAuthorToDisplayName).join(', '),
     genre: subjects.slice(0, 3).join(', '),
     publisher: publishers.slice(0, 1).join(', '),
     cover_url: null
