@@ -38,7 +38,9 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .book { transition: transform .15s ease, box-shadow .15s ease; }
   .btn { transition: transform .1s ease, background .15s ease; }
+  .toast { animation: toast-in .18s ease; }
 }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Topbar ---------- */
 /* Fige le bandeau + la barre d'outils en haut de l'écran au défilement,
@@ -489,6 +491,43 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 
 .btn-bordered { border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
 .btn-bordered:hover { border-color: var(--forest); color: var(--forest); }
+
+/* ---------- Modale de confirmation ---------- */
+#confirmBackdrop { z-index: 60; align-items: center; }
+.modal-small { max-width: 380px; }
+.confirm-message { font-size: 14px; line-height: 1.5; color: var(--ink-soft); margin: 0; }
+.modal-actions-end { justify-content: flex-end; }
+
+/* ---------- Notifications (toasts) ---------- */
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+  width: 100%;
+  padding: 0 16px;
+}
+.toast {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--forest);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+  max-width: min(420px, 100%);
+  pointer-events: auto;
+}
+.toast.error { border-left-color: var(--burgundy); }
+.toast.success { border-left-color: var(--forest); }
 
 /* ---------- Tabs (import en masse) ---------- */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }

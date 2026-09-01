@@ -23,6 +23,36 @@ const bookForm = $('#bookForm');
 const deleteBtn = $('#deleteBtn');
 const isbnStatus = $('#isbnStatus');
 
+// ---------- Notifications (remplacent alert()) ----------
+function showToast(message, type = 'info', duration = 4500) {
+  const container = $('#toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type !== 'info' ? ' ' + type : '');
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ---------- Confirmation (remplace confirm()) ----------
+const confirmBackdrop = $('#confirmBackdrop');
+const confirmMessageEl = $('#confirmMessage');
+const confirmOkBtn = $('#confirmOkBtn');
+let confirmResolve = null;
+
+function showConfirm(message, okLabel = 'Confirmer') {
+  confirmMessageEl.textContent = message;
+  confirmOkBtn.textContent = okLabel;
+  confirmBackdrop.hidden = false;
+  return new Promise((resolve) => { confirmResolve = resolve; });
+}
+function closeConfirm(result) {
+  confirmBackdrop.hidden = true;
+  if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
+}
+confirmOkBtn.addEventListener('click', () => closeConfirm(true));
+$('#confirmCancelBtn').addEventListener('click', () => closeConfirm(false));
+confirmBackdrop.addEventListener('click', (e) => { if (e.target === confirmBackdrop) closeConfirm(false); });
+
 let currentBooks = [];
 let viewMode = localStorage.getItem('bibliotheque_view') || 'grid';
 let currentStatus = 'possede'; // 'possede' = bibliothèque, 'souhaite' = liste de souhaits
@@ -126,10 +156,51 @@ async function refreshFilterOptions() {
   loadOwnerOptions();
 }
 
+// Un filtre est actif dès que la recherche ou l'un des menus déroulants
+// s'écarte de sa valeur par défaut (le tri n'en fait pas partie : il ne change
+// jamais le nombre de résultats).
+function hasActiveFilters() {
+  return !!(
+    $('#searchInput').value.trim() ||
+    $('#filterType').value ||
+    $('#filterLu').value !== '' ||
+    $('#filterGenre').value ||
+    $('#filterPublisher').value ||
+    $('#filterSeries').value ||
+    $('#filterOwner').value ||
+    $('#filterNote').value
+  );
+}
+
+function clearFilters() {
+  $('#searchInput').value = '';
+  $('#filterType').value = '';
+  $('#filterLu').value = '';
+  $('#filterGenre').value = '';
+  $('#filterPublisher').value = '';
+  $('#filterSeries').value = '';
+  $('#filterOwner').value = '';
+  $('#filterNote').value = '';
+  loadBooks();
+}
+$('#clearFiltersBtn').addEventListener('click', clearFilters);
+$('#emptyClearFiltersBtn').addEventListener('click', clearFilters);
+
 function renderShelf() {
   shelfEl.innerHTML = '';
   shelfEl.classList.toggle('list-view', viewMode === 'list');
-  emptyStateEl.hidden = currentBooks.length !== 0;
+  const isEmpty = currentBooks.length === 0;
+  emptyStateEl.hidden = !isEmpty;
+  if (isEmpty) {
+    // Distingue "aucun livre du tout" (message d'accueil habituel) de "des
+    // livres existent mais aucun ne correspond aux filtres actifs" — sans
+    // quoi le message "Votre étagère est vide" s'affiche même quand la
+    // bibliothèque est pleine, juste filtrée à zéro résultat.
+    const noResults = hasActiveFilters();
+    $('#emptyStateNoResults').hidden = !noResults;
+    $('#emptyStateSold').hidden = noResults || currentStatus !== 'revendu';
+    $('#emptyStateDefault').hidden = noResults || currentStatus === 'revendu';
+  }
   for (const book of currentBooks) {
     shelfEl.appendChild(renderBookCard(book));
   }
@@ -475,14 +546,15 @@ bookForm.addEventListener('submit', async (e) => {
     refreshFilterOptions();
   } else {
     const err = await res.json();
-    alert(err.error || 'Erreur lors de l\'enregistrement.');
+    showToast(err.error || 'Erreur lors de l\'enregistrement.', 'error');
   }
 });
 
 deleteBtn.addEventListener('click', async () => {
   const id = $('#bookId').value;
   if (!id) return;
-  if (!confirm('Supprimer ce livre de la bibliothèque ?')) return;
+  const ok = await showConfirm('Supprimer ce livre de la bibliothèque ?', 'Supprimer');
+  if (!ok) return;
   const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
   if (res.ok) {
     closeModal();
@@ -507,7 +579,7 @@ async function setBookStatus(status, errorMessage) {
     await loadStats();
     refreshFilterOptions();
   } else {
-    alert(errorMessage);
+    showToast(errorMessage, 'error');
   }
 }
 
@@ -877,13 +949,13 @@ $('#localizeCoversBtn').addEventListener('click', async () => {
     const res = await fetch('/api/covers/localize-all', { method: 'POST' });
     const data = await res.json();
     if (data.total === 0) {
-      alert(`Rien à faire : ${data.alreadyLocal} couverture(s) déjà en cache local.`);
+      showToast(`Rien à faire : ${data.alreadyLocal} couverture(s) déjà en cache local.`, 'success', 7000);
     } else {
-      alert(`${data.done} couverture(s) optimisée(s) et mise(s) en cache local, ${data.failed} échec(s) (source injoignable ou image invalide). ${data.alreadyLocal} l'étaient déjà.`);
+      showToast(`${data.done} couverture(s) optimisée(s) et mise(s) en cache local, ${data.failed} échec(s) (source injoignable ou image invalide). ${data.alreadyLocal} l'étaient déjà.`, 'success', 7000);
     }
     await loadBooks();
   } catch (err) {
-    alert("Erreur réseau pendant l'optimisation des couvertures.");
+    showToast("Erreur réseau pendant l'optimisation des couvertures.", 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = originalText;

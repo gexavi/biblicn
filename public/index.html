@@ -83,6 +83,7 @@
     <option value="author">Auteur (A-Z)</option>
     <option value="note">Meilleure note</option>
   </select>
+  <button class="btn btn-ghost btn-bordered" id="clearFiltersBtn" type="button">✕ Réinitialiser les filtres</button>
   <div class="view-toggle" role="group" aria-label="Mode d'affichage">
     <button class="view-btn active" id="viewGridBtn" type="button" aria-label="Vue grille" title="Vue grille">▦</button>
     <button class="view-btn" id="viewListBtn" type="button" aria-label="Vue liste" title="Vue liste">☰</button>
@@ -95,6 +96,7 @@
   <p id="emptyState" class="empty-state" hidden>
     <span id="emptyStateDefault">Votre étagère est vide. <button class="link-btn" id="emptyAddBtn">Ajoutez votre premier livre</button>.</span>
     <span id="emptyStateSold" hidden>Aucun livre revendu pour le moment.</span>
+    <span id="emptyStateNoResults" hidden>Aucun livre ne correspond à ces critères. <button class="link-btn" id="emptyClearFiltersBtn">Réinitialiser les filtres</button>.</span>
   </p>
 </main>
 
@@ -283,6 +285,25 @@
   </div>
   <div id="ownerStatsContent" class="owner-stats-content"></div>
 </div>
+
+<!-- Modale de confirmation (remplace confirm() natif) -->
+<div class="modal-backdrop confirm-backdrop" id="confirmBackdrop" hidden>
+  <div class="modal modal-small">
+    <div class="modal-head">
+      <h2 id="confirmTitle">Confirmer</h2>
+    </div>
+    <p class="confirm-message" id="confirmMessage"></p>
+    <div class="modal-actions modal-actions-end">
+      <div class="modal-actions-right">
+        <button type="button" class="btn btn-ghost" id="confirmCancelBtn">Annuler</button>
+        <button type="button" class="btn btn-danger" id="confirmOkBtn">Confirmer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications (remplacent alert() natif) -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
 <script src="app.js"></script>
 </body>
