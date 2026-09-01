@@ -62,6 +62,8 @@ AUTH_PASSWORD=votre_mot_de_passe
 
 Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
 
+**Protection anti-bruteforce** : après 5 tentatives de connexion échouées, l'adresse IP à l'origine des tentatives est bloquée 5 minutes avant de pouvoir réessayer. Si vous accédez à l'application via le **Reverse Proxy** du DSM (voir plus haut), toutes les requêtes arrivent à l'application avec l'adresse IP interne du reverse proxy plutôt que celle du visiteur : le blocage s'applique alors à tous les utilisateurs passant par ce proxy en cas d'échecs répétés, plutôt qu'à un seul visiteur malveillant. Sans incidence pour un usage familial normal (peu de monde se trompe 5 fois de suite), mais à garder en tête.
+
 ## Réglages avancés (optionnels)
 
 En plus de `AUTH_USERNAME`/`AUTH_PASSWORD`, quelques variables d'environnement optionnelles (valeur par défaut appliquée si absentes) permettent d'ajuster le comportement de l'application sans toucher au code. Voir le fichier `.env.example` pour la liste complète avec description :
@@ -96,6 +98,11 @@ Toutes les données sont dans le dossier `data/` (fichier `bibliotheque.db`). Il
 npm install
 npm start
 # puis ouvrez http://localhost:3000
+```
+
+**Tests** : la logique pure sans effet de bord (conversion ISBN-10/13, fusion des sources de recherche, anti-bruteforce sur la connexion, etc.) est extraite dans `lib/` et testée avec le testeur intégré à Node.js (aucune dépendance supplémentaire) :
+```bash
+npm test
 ```
 
 ## Import en masse

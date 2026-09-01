@@ -9,6 +9,7 @@ COPY package.json ./
 RUN npm install --omit=dev
 
 COPY server.js ./
+COPY lib ./lib
 COPY public ./public
 
 ENV DATA_DIR=/app/data

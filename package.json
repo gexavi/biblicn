@@ -4,7 +4,8 @@
   "description": "Application de gestion de bibliothèque personnelle - recherche par ISBN, auto-hébergée",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

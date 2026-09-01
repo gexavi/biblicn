@@ -5,6 +5,11 @@ const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const fetch = require('node-fetch');
 const sharp = require('sharp');
+const {
+  isbn10to13, isbn13to10, isbnVariants, xmlUnescape, extractAllXmlTags,
+  bnfAuthorToDisplayName, mergeIsbnResults, normalizeStatus, normalizeType
+} = require('./lib/isbn-utils');
+const { createLoginThrottle } = require('./lib/login-throttle');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,6 +103,16 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
+// ---------- Anti-bruteforce sur /api/login ----------
+// L'identifiant/mot de passe est unique et partagé (voir plus haut) : sans
+// limite de tentatives, une app exposée via reverse proxy (recommandé par le
+// README pour l'accès distant) serait vulnérable à un bruteforce en ligne.
+// Compteur en mémoire par IP (pas besoin de survivre à un redémarrage) : après
+// 5 échecs consécutifs, l'IP est bloquée 5 minutes avant de pouvoir retenter.
+// Logique dans lib/login-throttle.js (testée dans test/login-throttle.test.js).
+const loginThrottle = createLoginThrottle({ maxAttempts: 5, lockoutMs: 5 * 60 * 1000 });
+setInterval(() => loginThrottle.prune(60 * 60 * 1000), 60 * 60 * 1000).unref();
+
 function parseCookies(req) {
   const header = req.headers.cookie;
   const cookies = {};
@@ -131,12 +146,21 @@ app.use((req, res, next) => {
 });
 
 app.post('/api/login', (req, res) => {
+  const remaining = loginThrottle.checkLockout(req.ip);
+  if (remaining > 0) {
+    const retryAfterSec = Math.ceil(remaining / 1000);
+    res.setHeader('Retry-After', retryAfterSec);
+    return res.status(429).json({ error: `Trop de tentatives, réessayez dans ${retryAfterSec}s` });
+  }
+
   const { username, password } = req.body || {};
   const validUser = typeof username === 'string' && safeCompare(username, AUTH_USERNAME);
   const validPass = typeof password === 'string' && safeCompare(password, AUTH_PASSWORD);
   if (!validUser || !validPass) {
+    loginThrottle.registerFailure(req.ip);
     return res.status(401).json({ error: 'Identifiant ou mot de passe incorrect' });
   }
+  loginThrottle.clearFailures(req.ip);
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
   db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)').run(token, expiresAt);
@@ -154,42 +178,9 @@ app.post('/api/logout', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/covers', express.static(COVERS_DIR, { maxAge: '30d' }));
 
-// ---------- Conversion ISBN-10 <-> ISBN-13 ----------
-// De nombreux livres (surtout les BD françaises anciennes) ne sont indexés
-// que sous une seule des deux formes selon la source. On génère donc
-// systématiquement l'autre forme et on interroge les deux.
-function isbn10to13(isbn10) {
-  if (!/^\d{9}[\dXx]$/.test(isbn10)) return null;
-  const core = '978' + isbn10.slice(0, 9);
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += Number(core[i]) * (i % 2 === 0 ? 1 : 3);
-  const check = (10 - (sum % 10)) % 10;
-  return core + check;
-}
-
-function isbn13to10(isbn13) {
-  if (!/^978\d{9}[\dXx]$/.test(isbn13)) return null;
-  const core = isbn13.slice(3, 12);
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += Number(core[i]) * (10 - i);
-  let check = (11 - (sum % 11)) % 11;
-  const checkChar = check === 10 ? 'X' : String(check);
-  return core + checkChar;
-}
-
-function isbnVariants(isbn) {
-  const variants = [isbn];
-  if (isbn.length === 10) {
-    const conv = isbn10to13(isbn);
-    if (conv) variants.push(conv);
-  } else if (isbn.length === 13) {
-    const conv = isbn13to10(isbn);
-    if (conv) variants.push(conv);
-  }
-  return variants;
-}
-
 // ---------- Recherche ISBN (Open Library + Google Books, fusionnés) ----------
+// isbn10to13/isbn13to10/isbnVariants sont dans lib/isbn-utils.js (fonctions
+// pures, testées dans test/isbn-utils.test.js).
 async function lookupOpenLibrary(isbn) {
   const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
   const res = await fetch(url, { timeout: 8000 });
@@ -353,35 +344,8 @@ async function lookupOpenLibraryEdition(isbn) {
 // éditeurs) ; la BnF, elle, référence quasiment tout ce qui est publié en
 // France via le dépôt légal. Pas de couverture fournie par cette API, mais
 // titre/auteur/genre y sont souvent plus fiables pour ces cas-là.
-function xmlUnescape(str) {
-  return str
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
-}
-
-function extractAllXmlTags(xml, tag) {
-  const re = new RegExp(`<[^:>]*:?${tag}[^>]*>([\\s\\S]*?)<\\/[^:>]*:?${tag}>`, 'g');
-  const out = [];
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    const val = xmlUnescape(m[1].trim());
-    if (val) out.push(val);
-  }
-  return out;
-}
-
-// La BnF fournit les auteurs au format bibliothécaire "Nom, Prénom" (ex.
-// "Herbert, Frank"), à l'inverse d'Open Library et Google Books qui donnent
-// déjà "Prénom Nom" — sans cette conversion, un livre trouvé via une source
-// puis l'autre selon l'ISBN se retrouve avec un format d'auteur incohérent
-// dans la bibliothèque. On ne coupe que sur la première virgule : un nom
-// composé après celle-ci (ex. "Saint-Exupéry, Antoine de") reste intact et
-// se retrouve simplement déplacé en tête ("Antoine de Saint-Exupéry").
-function bnfAuthorToDisplayName(creator) {
-  const m = creator.match(/^([^,]+),\s*(.+)$/);
-  return m ? `${m[2]} ${m[1]}`.trim() : creator;
-}
-
+// xmlUnescape/extractAllXmlTags/bnfAuthorToDisplayName sont dans
+// lib/isbn-utils.js (fonctions pures, testées).
 async function lookupBnf(isbn) {
   const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&query=bib.isbn%20all%20%22${isbn}%22&recordSchema=dublincore&maximumRecords=1`;
   const res = await fetch(url, { timeout: 8000 });
@@ -404,23 +368,7 @@ async function lookupBnf(isbn) {
   };
 }
 
-// Fusionne les réponses déjà arrivées (title/author/genre/publisher/cover_url),
-// en gardant la première valeur non vide rencontrée dans l'ordre du tableau.
-function mergeIsbnResults(results) {
-  const firstNonEmpty = (key) => {
-    for (const r of results) {
-      if (r && r[key] && String(r[key]).trim()) return r[key];
-    }
-    return '';
-  };
-  return {
-    title: firstNonEmpty('title'),
-    author: firstNonEmpty('author'),
-    genre: firstNonEmpty('genre'),
-    publisher: firstNonEmpty('publisher'),
-    cover_url: firstNonEmpty('cover_url') || null
-  };
-}
+// mergeIsbnResults est dans lib/isbn-utils.js (fonction pure, testée).
 
 // Interroge Open Library + Google Books, sur la forme ISBN-10 ET ISBN-13,
 // et fusionne tous les résultats non vides (l'auteur et la couverture sont
@@ -795,23 +743,8 @@ app.post('/api/books/bulk-isbn', async (req, res) => {
   });
 });
 
-// Statuts valides pour la fiche d'un livre : 'possede' (bibliothèque),
-// 'souhaite' (liste de souhaits), 'revendu' (n'apparaît plus dans les listes
-// possédées ni dans les statistiques de collection, mais reste compté dans
-// l'historique de lecture des propriétaires — voir /api/stats/owners).
-const VALID_STATUSES = ['possede', 'souhaite', 'revendu'];
-function normalizeStatus(raw) {
-  return VALID_STATUSES.includes(raw) ? raw : 'possede';
-}
-
-// Types valides pour la fiche d'un livre.
-const VALID_TYPES = ['roman', 'bd', 'manga', 'essai', 'autre'];
-function normalizeType(raw) {
-  const t = String(raw || '').trim().toLowerCase();
-  const aliases = { bds: 'bd', mangas: 'manga', essais: 'essai', 'roman graphique': 'bd' };
-  const normalized = aliases[t] || t;
-  return VALID_TYPES.includes(normalized) ? normalized : 'roman';
-}
+// normalizeStatus/normalizeType (+ VALID_STATUSES/VALID_TYPES) sont dans
+// lib/isbn-utils.js (fonctions pures, testées).
 
 // ---------- Import en masse par liste d'objets (CSV déjà parsé côté client) ----------
 app.post('/api/books/bulk', async (req, res) => {
