@@ -39,6 +39,7 @@ body {
   .book { transition: transform .15s ease, box-shadow .15s ease; }
   .btn { transition: transform .1s ease, background .15s ease; }
   .toast { animation: toast-in .18s ease; }
+  .shelf { transition: opacity .15s ease; }
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
@@ -142,6 +143,20 @@ img.brand-mark {
   background: none; border: none; color: var(--forest); font-weight: 600;
   text-decoration: underline; cursor: pointer; font-size: inherit; font-family: inherit; padding: 0;
 }
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--forest);
+  color: #0E1712;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
 
 /* ---------- Toolbar ---------- */
 .toolbar {
@@ -165,6 +180,11 @@ img.brand-mark {
 .search-input::placeholder { color: var(--ink-soft); }
 .search-input { flex: 1; min-width: 200px; }
 .select { min-width: 150px; }
+/* Repli mobile des filtres (voir @media max-width:640px) : sur desktop le
+   bouton reste caché et le conteneur "display: contents" le rend transparent
+   au layout, donc identique pixel pour pixel à l'ancienne structure plate. */
+.toolbar-toggle-btn { display: none; }
+.toolbar-filters { display: contents; }
 
 .view-toggle {
   display: flex;
@@ -197,6 +217,7 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   grid-template-columns: 1fr;
   gap: 10px;
 }
+.shelf.loading { opacity: .5; pointer-events: none; }
 
 .book {
   background: var(--paper);
@@ -705,4 +726,12 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   .shelf { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .shelf.list-view .book-content { flex-direction: column; align-items: flex-start; gap: 4px; }
   .shelf.list-view .book-meta { gap: 10px; }
+
+  /* Repli des filtres secondaires (recherche/tri/vue restent visibles) pour
+     ne pas repousser les livres sous plusieurs lignes de filtres au chargement. */
+  .toolbar-toggle-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .toolbar-filters { display: flex; flex-direction: column; flex-basis: 100%; gap: 10px; }
+  .toolbar-filters.toolbar-filters-collapsed { display: none; }
+  .toolbar-filters .select,
+  .toolbar-filters #clearFiltersBtn { width: 100%; }
 }

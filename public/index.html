@@ -44,46 +44,52 @@
 
 <div class="toolbar">
   <input type="search" id="searchInput" placeholder="Rechercher un titre, un auteur, une série, un ISBN…" class="search-input">
-  <select id="filterType" class="select">
-    <option value="">Tous les types</option>
-    <option value="roman">Roman</option>
-    <option value="bd">BD</option>
-    <option value="manga">Manga</option>
-    <option value="essai">Essai</option>
-    <option value="autre">Autre</option>
-  </select>
-  <select id="filterLu" class="select">
-    <option value="">Lu / non lu</option>
-    <option value="1">Lus</option>
-    <option value="0">Non lus</option>
-  </select>
-  <select id="filterGenre" class="select">
-    <option value="">Tous les genres</option>
-  </select>
-  <select id="filterPublisher" class="select">
-    <option value="">Tous les éditeurs</option>
-  </select>
-  <select id="filterSeries" class="select">
-    <option value="">Toutes les séries</option>
-  </select>
-  <select id="filterOwner" class="select">
-    <option value="">Appartient à (tous)</option>
-  </select>
-  <select id="filterNote" class="select">
-    <option value="">Toutes les notes</option>
-    <option value="18">18/20 et plus</option>
-    <option value="16">16/20 et plus</option>
-    <option value="14">14/20 et plus</option>
-    <option value="12">12/20 et plus</option>
-    <option value="10">10/20 et plus</option>
-  </select>
+  <button class="btn btn-bordered toolbar-toggle-btn" id="toggleFiltersBtn" type="button" aria-expanded="false" aria-controls="toolbarFilters">
+    <span id="toggleFiltersLabel">▾ Filtres</span>
+    <span class="filter-badge" id="filterBadge" hidden>0</span>
+  </button>
+  <div class="toolbar-filters" id="toolbarFilters">
+    <select id="filterType" class="select">
+      <option value="">Tous les types</option>
+      <option value="roman">Roman</option>
+      <option value="bd">BD</option>
+      <option value="manga">Manga</option>
+      <option value="essai">Essai</option>
+      <option value="autre">Autre</option>
+    </select>
+    <select id="filterLu" class="select">
+      <option value="">Lu / non lu</option>
+      <option value="1">Lus</option>
+      <option value="0">Non lus</option>
+    </select>
+    <select id="filterGenre" class="select">
+      <option value="">Tous les genres</option>
+    </select>
+    <select id="filterPublisher" class="select">
+      <option value="">Tous les éditeurs</option>
+    </select>
+    <select id="filterSeries" class="select">
+      <option value="">Toutes les séries</option>
+    </select>
+    <select id="filterOwner" class="select">
+      <option value="">Appartient à (tous)</option>
+    </select>
+    <select id="filterNote" class="select">
+      <option value="">Toutes les notes</option>
+      <option value="18">18/20 et plus</option>
+      <option value="16">16/20 et plus</option>
+      <option value="14">14/20 et plus</option>
+      <option value="12">12/20 et plus</option>
+      <option value="10">10/20 et plus</option>
+    </select>
+    <button class="btn btn-ghost btn-bordered" id="clearFiltersBtn" type="button">✕ Réinitialiser les filtres</button>
+  </div>
   <select id="sortBy" class="select">
     <option value="recent">Récemment ajoutés</option>
     <option value="title">Titre (A-Z)</option>
     <option value="author">Auteur (A-Z)</option>
     <option value="note">Meilleure note</option>
   </select>
-  <button class="btn btn-ghost btn-bordered" id="clearFiltersBtn" type="button">✕ Réinitialiser les filtres</button>
   <div class="view-toggle" role="group" aria-label="Mode d'affichage">
     <button class="view-btn active" id="viewGridBtn" type="button" aria-label="Vue grille" title="Vue grille">▦</button>
     <button class="view-btn" id="viewListBtn" type="button" aria-label="Vue liste" title="Vue liste">☰</button>
@@ -94,6 +100,7 @@
 <main>
   <div id="shelf" class="shelf"></div>
   <p id="emptyState" class="empty-state" hidden>
+    <span id="emptyStateLoading" hidden>Chargement de votre bibliothèque…</span>
     <span id="emptyStateDefault">Votre étagère est vide. <button class="link-btn" id="emptyAddBtn">Ajoutez votre premier livre</button>.</span>
     <span id="emptyStateSold" hidden>Aucun livre revendu pour le moment.</span>
     <span id="emptyStateNoResults" hidden>Aucun livre ne correspond à ces critères. <button class="link-btn" id="emptyClearFiltersBtn">Réinitialiser les filtres</button>.</span>
@@ -102,7 +109,7 @@
 
 <!-- Modale ajout / édition -->
 <div class="modal-backdrop" id="modalBackdrop" hidden>
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-head">
       <h2 id="modalTitle">Ajouter un livre</h2>
       <button class="icon-btn" id="closeModalBtn" aria-label="Fermer">✕</button>
@@ -110,7 +117,7 @@
 
     <div class="isbn-row">
       <input type="text" id="isbnInput" placeholder="Scanner ou saisir un ISBN" class="isbn-input" inputmode="numeric">
-      <button class="btn btn-bordered" id="scanBarcodeBtn" type="button" title="Scanner un code-barres">📷</button>
+      <button class="btn btn-bordered" id="scanBarcodeBtn" type="button" title="Scanner un code-barres" aria-label="Scanner un code-barres">📷</button>
       <button class="btn btn-secondary" id="isbnLookupBtn">Rechercher</button>
     </div>
     <p class="isbn-status" id="isbnStatus"></p>
@@ -211,9 +218,9 @@
 
 <!-- Modale import en masse -->
 <div class="modal-backdrop" id="bulkModalBackdrop" hidden>
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bulkModalTitle">
     <div class="modal-head">
-      <h2>Import en masse</h2>
+      <h2 id="bulkModalTitle">Import en masse</h2>
       <button class="icon-btn" id="closeBulkModalBtn" aria-label="Fermer">✕</button>
     </div>
 
@@ -267,9 +274,9 @@
 </div>
 
 <!-- Overlay de scan de code-barres -->
-<div class="scanner-overlay" id="scannerOverlay" hidden>
+<div class="scanner-overlay" id="scannerOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="scannerTitle">
   <div class="scanner-head">
-    <h2>Scanner un code-barres</h2>
+    <h2 id="scannerTitle">Scanner un code-barres</h2>
     <button class="icon-btn" id="closeScannerBtn" aria-label="Fermer">✕</button>
   </div>
   <p class="scanner-hint">Visez le code-barres ISBN au dos du livre (le plus souvent EAN-13, sous le prix).</p>
@@ -278,9 +285,9 @@
 </div>
 
 <!-- Overlay de statistiques par propriétaire -->
-<div class="scanner-overlay" id="statsOverlay" hidden>
+<div class="scanner-overlay" id="statsOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="statsTitle">
   <div class="scanner-head">
-    <h2>Statistiques par propriétaire</h2>
+    <h2 id="statsTitle">Statistiques par propriétaire</h2>
     <button class="icon-btn" id="closeStatsBtn" aria-label="Fermer">✕</button>
   </div>
   <div id="ownerStatsContent" class="owner-stats-content"></div>
@@ -288,7 +295,7 @@
 
 <!-- Modale de confirmation (remplace confirm() natif) -->
 <div class="modal-backdrop confirm-backdrop" id="confirmBackdrop" hidden>
-  <div class="modal modal-small">
+  <div class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal-head">
       <h2 id="confirmTitle">Confirmer</h2>
     </div>

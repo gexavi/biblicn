@@ -15,6 +15,31 @@ if ('serviceWorker' in navigator) {
 
 const $ = (sel) => document.querySelector(sel);
 
+// ---------- Focus (accessibilité) ----------
+// Pile plutôt qu'une simple variable : le scanner et la confirmation de
+// suppression s'ouvrent tous deux depuis l'intérieur de la modale
+// d'ajout/édition, donc deux surfaces peuvent être imbriquées et il faut
+// restaurer le focus dans le bon ordre à la fermeture.
+// setBackgroundInert n'est basculé qu'aux transitions 0 <-> 1 surface ouverte
+// (pas à chaque imbrication) : sans quoi fermer une confirmation ouverte
+// par-dessus la modale d'ajout/édition rendrait le fond re-focusable au
+// clavier alors que cette modale, elle, est toujours ouverte derrière.
+let focusStack = [];
+function rememberFocus() {
+  if (focusStack.length === 0) setBackgroundInert(true);
+  focusStack.push(document.activeElement);
+}
+function restoreFocus() {
+  const el = focusStack.pop();
+  if (el && typeof el.focus === 'function') el.focus();
+  if (focusStack.length === 0) setBackgroundInert(false);
+}
+// Empêche Tab d'atteindre le contenu visuellement masqué derrière une modale.
+function setBackgroundInert(inert) {
+  $('.sticky-header').inert = inert;
+  $('main').inert = inert;
+}
+
 const shelfEl = $('#shelf');
 const emptyStateEl = $('#emptyState');
 const modalBackdrop = $('#modalBackdrop');
@@ -42,11 +67,14 @@ let confirmResolve = null;
 function showConfirm(message, okLabel = 'Confirmer') {
   confirmMessageEl.textContent = message;
   confirmOkBtn.textContent = okLabel;
+  rememberFocus();
   confirmBackdrop.hidden = false;
+  setTimeout(() => $('#confirmCancelBtn').focus(), 50);
   return new Promise((resolve) => { confirmResolve = resolve; });
 }
 function closeConfirm(result) {
   confirmBackdrop.hidden = true;
+  restoreFocus();
   if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
 }
 confirmOkBtn.addEventListener('click', () => closeConfirm(true));
@@ -54,12 +82,19 @@ $('#confirmCancelBtn').addEventListener('click', () => closeConfirm(false));
 confirmBackdrop.addEventListener('click', (e) => { if (e.target === confirmBackdrop) closeConfirm(false); });
 
 let currentBooks = [];
+let booksLoadedOnce = false;
+let initialLoadTimer = null;
 let viewMode = localStorage.getItem('bibliotheque_view') || 'grid';
 let currentStatus = 'possede'; // 'possede' = bibliothèque, 'souhaite' = liste de souhaits
 
 const PLACEHOLDER_COVER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="76"><rect width="52" height="76" fill="#212A36"/><text x="26" y="42" font-size="22" text-anchor="middle" fill="#57A181" font-family="serif">§</text></svg>'
 );
+
+// Délai avant d'afficher un indicateur de chargement (dim de l'étagère,
+// message "Chargement…") — évite le clignotement sur les requêtes locales
+// rapides déclenchées à chaque frappe/changement de filtre.
+const LOADING_DELAY_MS = 180;
 
 function coverSrc(book) {
   if (book.cover_url) return book.cover_url;
@@ -81,6 +116,8 @@ async function loadStats() {
   $('#statPretes').textContent = stats.pretes;
   $('#statSouhaites').textContent = stats.souhaites;
 }
+
+let booksLoadingTimer = null;
 
 async function loadBooks() {
   const params = new URLSearchParams();
@@ -104,9 +141,25 @@ async function loadBooks() {
   if (minNote) params.set('minNote', minNote);
   if (sort) params.set('sort', sort);
 
-  const res = await fetch('/api/books?' + params.toString());
-  currentBooks = await res.json();
-  renderShelf();
+  updateFilterToggleUI();
+
+  clearTimeout(booksLoadingTimer);
+  booksLoadingTimer = setTimeout(() => shelfEl.classList.add('loading'), LOADING_DELAY_MS);
+  try {
+    const res = await fetch('/api/books?' + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    currentBooks = await res.json();
+    booksLoadedOnce = true;
+    renderShelf();
+  } catch (err) {
+    booksLoadedOnce = true;
+    currentBooks = [];
+    renderShelf();
+    showToast('Erreur réseau lors du chargement de la bibliothèque.', 'error');
+  } finally {
+    clearTimeout(booksLoadingTimer);
+    shelfEl.classList.remove('loading');
+  }
 }
 
 async function loadGenreOptions() {
@@ -159,17 +212,23 @@ async function refreshFilterOptions() {
 // Un filtre est actif dès que la recherche ou l'un des menus déroulants
 // s'écarte de sa valeur par défaut (le tri n'en fait pas partie : il ne change
 // jamais le nombre de résultats).
-function hasActiveFilters() {
-  return !!(
-    $('#searchInput').value.trim() ||
-    $('#filterType').value ||
-    $('#filterLu').value !== '' ||
-    $('#filterGenre').value ||
-    $('#filterPublisher').value ||
-    $('#filterSeries').value ||
-    $('#filterOwner').value ||
+function activeFilterValues() {
+  return [
+    $('#searchInput').value.trim(),
+    $('#filterType').value,
+    $('#filterLu').value,
+    $('#filterGenre').value,
+    $('#filterPublisher').value,
+    $('#filterSeries').value,
+    $('#filterOwner').value,
     $('#filterNote').value
-  );
+  ];
+}
+function hasActiveFilters() {
+  return activeFilterValues().some(Boolean);
+}
+function activeFilterCount() {
+  return activeFilterValues().filter(Boolean).length;
 }
 
 function clearFilters() {
@@ -186,9 +245,46 @@ function clearFilters() {
 $('#clearFiltersBtn').addEventListener('click', clearFilters);
 $('#emptyClearFiltersBtn').addEventListener('click', clearFilters);
 
+// ---------- Filtres mobiles (repli) ----------
+const toolbarFilters = $('#toolbarFilters');
+const toggleFiltersBtn = $('#toggleFiltersBtn');
+
+function updateFilterToggleUI() {
+  const count = activeFilterCount();
+  const badge = $('#filterBadge');
+  badge.textContent = count;
+  badge.hidden = count === 0;
+  const expanded = !toolbarFilters.classList.contains('toolbar-filters-collapsed');
+  toggleFiltersBtn.setAttribute('aria-expanded', String(expanded));
+  $('#toggleFiltersLabel').textContent = expanded ? '▴ Filtres' : '▾ Filtres';
+}
+function setFiltersCollapsed(collapsed) {
+  toolbarFilters.classList.toggle('toolbar-filters-collapsed', collapsed);
+  updateFilterToggleUI();
+}
+toggleFiltersBtn.addEventListener('click', () => {
+  setFiltersCollapsed(!toolbarFilters.classList.contains('toolbar-filters-collapsed'));
+});
+// Replié par défaut à chaque chargement — sans effet sur desktop, où
+// .toolbar-filters reste "display: contents" en dehors du point de rupture
+// mobile (voir style.css), et sans persistance : contrairement au choix
+// grille/liste, "panneau de filtres ouvert" est un état transitoire qu'on ne
+// veut pas retrouver rouvert la prochaine visite.
+setFiltersCollapsed(true);
+
 function renderShelf() {
   shelfEl.innerHTML = '';
   shelfEl.classList.toggle('list-view', viewMode === 'list');
+  clearTimeout(initialLoadTimer);
+  $('#emptyStateLoading').hidden = true;
+  if (!booksLoadedOnce) {
+    // Avant la toute première réponse du serveur, currentBooks vaut encore
+    // [] par défaut : sans ce garde, le rendu initial (déclenché par
+    // setViewMode() avant même que loadBooks() ait pu répondre) afficherait
+    // à tort "Votre étagère est vide" pendant le chargement.
+    emptyStateEl.hidden = true;
+    return;
+  }
   const isEmpty = currentBooks.length === 0;
   emptyStateEl.hidden = !isEmpty;
   if (isEmpty) {
@@ -325,6 +421,7 @@ function toggleReadDateVisibility() {
 $('#fieldLu').addEventListener('change', toggleReadDateVisibility);
 
 function openAddModal() {
+  rememberFocus();
   bookForm.reset();
   $('#bookId').value = '';
   $('#fieldIsbn').value = '';
@@ -351,6 +448,7 @@ function openAddModal() {
 }
 
 function openEditModal(book) {
+  rememberFocus();
   bookForm.reset();
   $('#bookId').value = book.id;
   $('#fieldTitle').value = book.title || '';
@@ -380,6 +478,7 @@ function openEditModal(book) {
   $('#unmarkSoldBtn').hidden = book.status !== 'revendu';
   updateSecondhandLinks(book);
   modalBackdrop.hidden = false;
+  setTimeout(() => $('#isbnInput').focus(), 50);
   toggleReadDateVisibility();
   updateModalCoverPreview();
 }
@@ -405,6 +504,7 @@ function updateSecondhandLinks(book) {
 function closeModal() {
   modalBackdrop.hidden = true;
   closeBarcodeScanner();
+  restoreFocus();
 }
 
 $('#logoutBtn').addEventListener('click', async () => {
@@ -422,25 +522,25 @@ modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop)
 let barcodeScanner = null;
 
 function openBarcodeScanner() {
+  rememberFocus();
   const overlay = $('#scannerOverlay');
   const statusEl = $('#scannerStatus');
   statusEl.textContent = '';
   statusEl.className = 'scanner-status';
+  overlay.hidden = false;
+  setTimeout(() => $('#closeScannerBtn').focus(), 50);
 
   if (!window.isSecureContext) {
     statusEl.textContent = "L'accès à la caméra nécessite une connexion sécurisée (HTTPS). Configurez un accès HTTPS (reverse proxy) sur votre NAS, ou saisissez l'ISBN à la main.";
     statusEl.className = 'scanner-status error';
-    overlay.hidden = false;
     return;
   }
   if (typeof Html5Qrcode === 'undefined') {
     statusEl.textContent = "La bibliothèque de scan n'a pas pu se charger (pas de connexion internet sur cet appareil ?). Saisissez l'ISBN à la main.";
     statusEl.className = 'scanner-status error';
-    overlay.hidden = false;
     return;
   }
 
-  overlay.hidden = false;
   barcodeScanner = new Html5Qrcode('barcodeReaderRegion', {
     formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A],
     verbose: false
@@ -462,11 +562,17 @@ function openBarcodeScanner() {
 }
 
 function closeBarcodeScanner() {
+  // closeModal() appelle toujours cette fonction par sécurité, même quand le
+  // scanner n'était pas ouvert : ne restaurer le focus que s'il l'était
+  // vraiment, sinon on dépile la pile de focus deux fois pour une seule
+  // fermeture réelle (celle de la modale d'ajout/édition qui l'englobait).
+  const wasOpen = !$('#scannerOverlay').hidden;
   $('#scannerOverlay').hidden = true;
   if (barcodeScanner) {
     barcodeScanner.stop().then(() => barcodeScanner.clear()).catch(() => {});
     barcodeScanner = null;
   }
+  if (wasOpen) restoreFocus();
 }
 
 $('#scanBarcodeBtn').addEventListener('click', openBarcodeScanner);
@@ -644,11 +750,17 @@ $('#viewSoldBtn').addEventListener('click', () => setStatus('revendu'));
 // ---------- Import en masse ----------
 const bulkModalBackdrop = $('#bulkModalBackdrop');
 
+function closeBulkModal() {
+  bulkModalBackdrop.hidden = true;
+  restoreFocus();
+}
 $('#openBulkBtn').addEventListener('click', () => {
+  rememberFocus();
   bulkModalBackdrop.hidden = false;
+  setTimeout(() => $('#bulkIsbnText').focus(), 50);
 });
-$('#closeBulkModalBtn').addEventListener('click', () => { bulkModalBackdrop.hidden = true; });
-bulkModalBackdrop.addEventListener('click', (e) => { if (e.target === bulkModalBackdrop) bulkModalBackdrop.hidden = true; });
+$('#closeBulkModalBtn').addEventListener('click', closeBulkModal);
+bulkModalBackdrop.addEventListener('click', (e) => { if (e.target === bulkModalBackdrop) closeBulkModal(); });
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -836,10 +948,17 @@ $('#downloadTemplateBtn').addEventListener('click', () => {
 
 // ---------- Statistiques par propriétaire ----------
 $('#openStatsBtn').addEventListener('click', openStatsOverlay);
-$('#closeStatsBtn').addEventListener('click', () => { $('#statsOverlay').hidden = true; });
+$('#closeStatsBtn').addEventListener('click', closeStatsOverlay);
+
+function closeStatsOverlay() {
+  $('#statsOverlay').hidden = true;
+  restoreFocus();
+}
 
 async function openStatsOverlay() {
+  rememberFocus();
   $('#statsOverlay').hidden = false;
+  setTimeout(() => $('#closeStatsBtn').focus(), 50);
   const content = $('#ownerStatsContent');
   content.innerHTML = '<p class="owner-stats-empty">Chargement…</p>';
   try {
@@ -962,7 +1081,24 @@ $('#localizeCoversBtn').addEventListener('click', async () => {
   }
 });
 
+// ---------- Fermeture au clavier (Echap) ----------
+// L'ordre reflète l'imbrication réelle (le scanner et la confirmation de
+// suppression s'ouvrent tous deux par-dessus la modale d'ajout/édition) :
+// il faut fermer la surface la plus "au-dessus" en premier.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#scannerOverlay').hidden) { closeBarcodeScanner(); return; }
+  if (!$('#statsOverlay').hidden) { closeStatsOverlay(); return; }
+  if (!confirmBackdrop.hidden) { closeConfirm(false); return; }
+  if (!modalBackdrop.hidden) { closeModal(); return; }
+  if (!bulkModalBackdrop.hidden) { closeBulkModal(); return; }
+});
+
 // ---------- Init ----------
+initialLoadTimer = setTimeout(() => {
+  $('#emptyStateLoading').hidden = false;
+  emptyStateEl.hidden = false;
+}, LOADING_DELAY_MS);
 loadBooks();
 loadStats();
 refreshFilterOptions();
