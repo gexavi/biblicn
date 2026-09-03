@@ -10,6 +10,10 @@ data/
 *.db-wal
 *.db-shm
 
+# Identifiants locaux (voir .env.example pour le modèle à copier)
+# -> ne doit JAMAIS être versionné, contient AUTH_USERNAME/AUTH_PASSWORD en clair
+.env
+
 # Fichiers système
 .DS_Store
 Thumbs.db

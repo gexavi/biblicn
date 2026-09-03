@@ -12,5 +12,8 @@
     "express": "^4.19.2",
     "node-fetch": "^2.7.0",
     "sharp": "^0.35.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
   }
 }
