@@ -856,12 +856,19 @@ app.get('/api/stats/owners', (req, res) => {
     }
   }
 
-  const result = [...owners.entries()].map(([name, entry]) => ({
-    name,
-    total: entry.total,
-    byGenre: [...entry.byGenre.entries()].sort((a, b) => b[1] - a[1]).map(([genre, count]) => ({ genre, count })),
-    byYear: [...entry.byYear.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([year, count]) => ({ year, count }))
-  })).sort((a, b) => b.total - a.total);
+  const result = [...owners.entries()]
+    // Un livre revendu, sans propriétaire renseigné et jamais lu (ou lu sans
+    // date) crée une entrée sans rien dedans (total à 0, aucun genre, aucune
+    // année) : on l'exclut plutôt que d'afficher une carte vide à côté des
+    // propriétaires ayant vraiment des livres.
+    .filter(([, entry]) => entry.total > 0 || entry.byGenre.size > 0 || entry.byYear.size > 0)
+    .map(([name, entry]) => ({
+      name,
+      total: entry.total,
+      byGenre: [...entry.byGenre.entries()].sort((a, b) => b[1] - a[1]).map(([genre, count]) => ({ genre, count })),
+      byYear: [...entry.byYear.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([year, count]) => ({ year, count }))
+    }))
+    .sort((a, b) => b.total - a.total);
 
   res.json(result);
 });
