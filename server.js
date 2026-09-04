@@ -133,7 +133,7 @@ function isValidSession(token) {
 
 app.use(express.json());
 
-const PUBLIC_PATHS = new Set(['/login.html', '/api/login', '/style.css']);
+const PUBLIC_PATHS = new Set(['/login.html', '/api/login', '/style.css', '/icons/icon.svg', '/icons/icon-192.png']);
 
 app.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path)) return next();
