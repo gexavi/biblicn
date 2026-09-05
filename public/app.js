@@ -310,7 +310,7 @@ function renderBookCard(book) {
 
   const isWishlist = book.status === 'souhaite';
   const isSold = book.status === 'revendu';
-  const noteHtml = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '<span></span>';
+  const noteHtml = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '';
   const readDateHtml = book.lu && book.read_date ? ` <span class="book-read-date">le ${formatDateFr(book.read_date)}</span>` : '';
   const statusHtml = book.lu
     ? `<span class="book-status lu">✓ Lu${readDateHtml}</span>`
@@ -324,7 +324,7 @@ function renderBookCard(book) {
     : '';
   const metaHtml = isWishlist
     ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
-    : `${statusHtml}${noteHtml}`;
+    : `${statusHtml}<span class="book-meta-right"><span class="book-type-tag">${typeLabel(book.type)}</span>${noteHtml}</span>`;
   const seriesHtml = book.series
     ? `<p class="book-series">📖 ${escapeHtml(book.series)}${book.series_number ? ` #${escapeHtml(book.series_number)}` : ''}</p>`
     : '';
@@ -335,7 +335,6 @@ function renderBookCard(book) {
     <div class="book-content">
       <div class="book-top">
         <p class="book-title">${escapeHtml(book.title)}</p>
-        <span class="book-type-tag">${typeLabel(book.type)}</span>
       </div>
       ${book.author
         ? `<p class="book-author book-author-link">${escapeHtml(book.author)}</p>`

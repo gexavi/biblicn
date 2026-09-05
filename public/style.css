@@ -245,7 +245,7 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
     inset 0 1px 0 rgba(255,255,255,.06),
     0 4px 10px rgba(0,0,0,.5),
     0 22px 48px rgba(0,0,0,.6);
-  padding: 0 0 12px;
+  padding: 0 0 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -263,6 +263,10 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 .book[data-type="manga"] { border-left-color: var(--manga); }
 .book[data-type="essai"] { border-left-color: var(--essai); }
 .book[data-type="autre"] { border-left-color: var(--ink-soft); }
+.book[data-type="bd"] .book-type-tag { color: var(--bd); border-color: var(--bd); }
+.book[data-type="manga"] .book-type-tag { color: var(--manga); border-color: var(--manga); }
+.book[data-type="essai"] .book-type-tag { color: var(--essai); border-color: var(--essai); }
+.book[data-type="autre"] .book-type-tag { color: var(--ink-soft); border-color: var(--ink-soft); }
 
 .shelf.list-view .book {
   flex-direction: row;
@@ -296,7 +300,6 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   min-width: 0;
   padding: 12px 14px 0;
 }
-.book-content .book-meta { padding-bottom: 2px; }
 .shelf.list-view .book-content {
   flex-direction: row;
   align-items: center;
@@ -317,8 +320,8 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .06em;
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
+  color: var(--roman);
+  border: 1px solid var(--roman);
   border-radius: 2px;
   padding: 2px 6px;
   white-space: nowrap;
@@ -330,6 +333,8 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   line-height: 1.25;
   margin: 0;
   color: var(--ink);
+  text-align: justify;
+  text-align-last: left;
 }
 .shelf.list-view .book-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .book-author { font-size: 13px; color: var(--ink-soft); margin: 0; }
@@ -349,16 +354,22 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   justify-content: space-between;
   font-size: 12px;
   color: var(--ink-soft);
-  padding-top: 8px;
+  /* .book-meta est un frère de .book-content, pas un enfant : sans ce
+     padding horizontal, "Non lu" partait du bord de la carte au lieu de
+     s'aligner avec le titre/genre juste au-dessus (qui, eux, héritent du
+     padding de .book-content). */
+  padding: 8px 14px 0;
   border-top: 1px dashed var(--line);
 }
+.book-meta-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .shelf.list-view .book-meta {
   margin-top: 0;
   border-top: none;
-  padding-top: 0;
+  padding: 0;
   flex: 0 0 auto;
   gap: 14px;
 }
+.shelf.list-view .book-meta-right { flex-direction: row; align-items: center; gap: 8px; }
 .book-note { font-family: var(--font-mono); color: var(--brass); font-weight: 500; }
 
 .quick-acquire-btn {
