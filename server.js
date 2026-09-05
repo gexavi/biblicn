@@ -16,6 +16,19 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const COVERS_DIR = path.join(DATA_DIR, 'covers');
 
+// ---------- En-têtes de sécurité de base ----------
+// Pas de Content-Security-Policy ici : l'app charge des polices Google
+// Fonts, le script de scan de code-barres depuis un CDN, et des couvertures
+// depuis des domaines externes variés (Amazon, Geobib, Open Library, sites
+// d'éditeurs collés manuellement dans le champ URL) — une CSP correcte sans
+// rien casser demande un travail dédié, pas juste ajouter une ligne ici.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 // ---------- Authentification (accès unique) ----------
 // Un seul couple identifiant/mot de passe, défini par variables d'environnement
 // (voir docker-compose.yml). L'app refuse de démarrer sans eux plutôt que de
@@ -935,6 +948,14 @@ function scheduleBackups() {
 
 scheduleBackups();
 
-app.listen(PORT, () => {
-  console.log(`Bibliothèque disponible sur le port ${PORT}`);
-});
+// Le démarrage effectif du serveur est gardé derrière ce test pour que les
+// tests (voir test/server.test.js) puissent importer `app` et choisir
+// eux-mêmes un port libre, sans lancer un vrai serveur en plus au moment du
+// `require`.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Bibliothèque disponible sur le port ${PORT}`);
+  });
+}
+
+module.exports = app;

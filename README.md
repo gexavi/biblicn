@@ -100,7 +100,7 @@ npm start
 # puis ouvrez http://localhost:3000
 ```
 
-**Tests** : la logique pure sans effet de bord (conversion ISBN-10/13, fusion des sources de recherche, anti-bruteforce sur la connexion, etc.) est extraite dans `lib/` et testée avec le testeur intégré à Node.js (aucune dépendance supplémentaire) :
+**Tests** : la logique pure sans effet de bord (conversion ISBN-10/13, fusion des sources de recherche, anti-bruteforce sur la connexion, etc.) est extraite dans `lib/` et testée isolément ; les routes de `server.js` (CRUD des livres, import en masse, statistiques) sont couvertes par des tests d'intégration qui démarrent l'app sur un port libre et une base de données temporaire — le tout avec le testeur intégré à Node.js, sans dépendance supplémentaire :
 ```bash
 npm test
 ```
