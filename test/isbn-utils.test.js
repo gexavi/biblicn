@@ -84,6 +84,15 @@ test('bnfAuthorToDisplayName laisse intact un nom sans virgule', () => {
   assert.equal(bnfAuthorToDisplayName('Frank Herbert'), 'Frank Herbert');
 });
 
+test('bnfAuthorToDisplayName retire les dates de naissance/mort et le rôle bibliographique', () => {
+  assert.equal(bnfAuthorToDisplayName('Coben, Harlan (1962-....). Auteur du texte'), 'Harlan Coben');
+  assert.equal(bnfAuthorToDisplayName('Dorison, Xavier (1972-....). Auteur du texte'), 'Xavier Dorison');
+});
+
+test('bnfAuthorToDisplayName retire une parenthèse même sans virgule', () => {
+  assert.equal(bnfAuthorToDisplayName('Frank Herbert (1920-1986)'), 'Frank Herbert');
+});
+
 test('mergeIsbnResults garde la première valeur non vide par champ, dans l\'ordre', () => {
   const results = [
     { title: '', author: '', genre: '', publisher: '', cover_url: null },
