@@ -310,11 +310,45 @@ function renderBookCard(book) {
 
   const isWishlist = book.status === 'souhaite';
   const isSold = book.status === 'revendu';
-  const noteHtml = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '';
+
+  // Bandeau sur la couverture (vue grille, façon carte à collectionner) :
+  // pastille de note en losange en haut à gauche, fanion "Lu" et numéro de
+  // tome en haut à droite. Repli en vue liste : voir metaRightFallback plus
+  // bas, la couverture y étant bien trop petite pour ces pastilles.
+  const noteBadgeHtml = book.note != null
+    ? `<div class="book-note-badge"><span>${book.note}<small>/20</small></span></div>`
+    : '';
+  const readFlagHtml = book.lu ? '<div class="book-read-flag">Lu</div>' : '';
+  const tomeBadgeHtml = book.series_number
+    ? `<div class="book-tome-badge">T.${escapeHtml(book.series_number)}</div>`
+    : '';
+  const topRightHtml = (readFlagHtml || tomeBadgeHtml)
+    ? `<div class="book-cover-topright">${readFlagHtml}${tomeBadgeHtml}</div>`
+    : '';
+
+  // Genres en étiquettes plutôt qu'en une seule ligne de texte, façon
+  // mots-clés de faction sur une carte à collectionner.
+  const genres = (book.genre || '').split(',').map(g => g.trim()).filter(Boolean);
+  const tagsHtml = genres.length
+    ? `<div class="book-tags">${genres.map(g => `<span class="book-tag">${escapeHtml(g)}</span>`).join('')}</div>`
+    : '';
+
+  // Le pied de carte ne montre "Lu" qu'une fois le livre lu — inutile de
+  // répéter "Non lu" sur chaque fiche non lue, c'est déjà l'état par défaut.
+  // Un span vide comble la gauche quand il n'y a rien à lire, sinon le badge
+  // de type (à droite) se retrouverait collé à gauche (.book-meta répartit
+  // ses DEUX enfants aux extrémités, un seul enfant se retrouve à gauche).
   const readDateHtml = book.lu && book.read_date ? ` <span class="book-read-date">le ${formatDateFr(book.read_date)}</span>` : '';
-  const statusHtml = book.lu
-    ? `<span class="book-status lu">✓ Lu${readDateHtml}</span>`
-    : '<span class="book-status">Non lu</span>';
+  const statusHtml = book.lu ? `<span class="book-status lu">✓ Lu${readDateHtml}</span>` : '<span></span>';
+  const noteHtmlInline = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '';
+  const metaRightFallback = `<span class="book-meta-right"><span class="book-type-tag">${typeLabel(book.type)}</span>${noteHtmlInline}</span>`;
+  // Le badge de type vit ici, dans le flux normal du pied de carte, plutôt
+  // qu'en position absolue par-dessus la carte : ça évitait un chevauchement
+  // avec la ligne propriétaire/emplacement sur les fiches à peu de contenu.
+  const metaHtml = isWishlist
+    ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
+    : `${statusHtml}<span class="book-meta-right-group">${metaRightFallback}<span class="book-type-corner">${typeLabel(book.type)}</span></span>`;
+
   const lentHtml = !isSold && book.lent_to
     ? `<div class="book-lent">Prêté à ${escapeHtml(book.lent_to)}</div>`
     : '';
@@ -322,27 +356,38 @@ function renderBookCard(book) {
   const ownerHtml = book.owner
     ? `<div class="book-owner">${ownerIcon} ${escapeHtml(book.owner)}</div>`
     : '';
-  const metaHtml = isWishlist
-    ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
-    : `${statusHtml}<span class="book-meta-right"><span class="book-type-tag">${typeLabel(book.type)}</span>${noteHtml}</span>`;
+  const locationHtml = (!isWishlist && !isSold && book.location)
+    ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>`
+    : '';
+  // Propriétaire et emplacement sur une même ligne (propriétaire à gauche,
+  // emplacement à droite) : un span vide comble le côté manquant si l'un des
+  // deux n'est pas renseigné, pour que l'autre garde sa position.
+  const infoRowHtml = (ownerHtml || locationHtml)
+    ? `<div class="book-info-row">${ownerHtml || '<span></span>'}${locationHtml || '<span></span>'}</div>`
+    : '';
   const seriesHtml = book.series
-    ? `<p class="book-series">📖 ${escapeHtml(book.series)}${book.series_number ? ` #${escapeHtml(book.series_number)}` : ''}</p>`
+    ? `<p class="book-series">📖 ${escapeHtml(book.series)}</p>`
     : '';
 
   el.innerHTML = `
-    <img class="book-cover" src="${escapeHtml(coverSrc(book))}" alt="" loading="lazy"
-      onerror="this.onerror=null;this.src='${PLACEHOLDER_COVER}';">
+    <div class="book-cover-wrap">
+      <img class="book-cover" src="${escapeHtml(coverSrc(book))}" alt="" loading="lazy"
+        onerror="this.onerror=null;this.src='${PLACEHOLDER_COVER}';">
+      ${noteBadgeHtml}
+      ${topRightHtml}
+    </div>
     <div class="book-content">
       <div class="book-top">
         <p class="book-title">${escapeHtml(book.title)}</p>
+        ${book.author
+          ? `<p class="book-author book-author-link">${escapeHtml(book.author)}</p>`
+          : `<p class="book-author">Auteur inconnu</p>`}
       </div>
-      ${book.author
-        ? `<p class="book-author book-author-link">${escapeHtml(book.author)}</p>`
-        : `<p class="book-author">Auteur inconnu</p>`}
+      <div class="book-divider"></div>
       ${seriesHtml}
-      ${book.genre ? `<p class="book-genre">${escapeHtml(book.genre)}</p>` : ''}
-      ${!isWishlist && !isSold && book.location ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>` : ''}
-      ${ownerHtml}
+      ${tagsHtml}
+      ${tagsHtml ? '<div class="book-divider"></div>' : ''}
+      ${infoRowHtml}
       ${lentHtml}
     </div>
     <div class="book-meta">

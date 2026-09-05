@@ -3,9 +3,9 @@
   --paper: #1B222C;
   --paper-raised: #212A36;
   --paper-elevated: #2B3543;
-  --line-elevated: #445269;
   --ink: #E9E6DC;
   --ink-soft: #94A0AC;
+  --ink-mid: #B7C0CB;
   --line: #2C3644;
   --brass: #D0A63F;
   --forest: #57A181;
@@ -238,19 +238,18 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
      pousser bien plus fort qu'en thème clair pour qu'une carte se détache
      vraiment du fond. */
   background: var(--paper-elevated);
-  border: 1px solid var(--line-elevated);
-  border-left: 6px solid var(--roman);
+  border: 2px solid var(--roman);
   border-radius: var(--radius);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.06),
     0 4px 10px rgba(0,0,0,.5),
     0 22px 48px rgba(0,0,0,.6);
-  padding: 0 0 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 0;
   overflow: hidden;
+  position: relative;
 }
 .book:hover {
   transform: translateY(-4px);
@@ -259,14 +258,39 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
     0 10px 20px rgba(0,0,0,.55),
     0 30px 56px rgba(0,0,0,.55);
 }
-.book[data-type="bd"] { border-left-color: var(--bd); }
-.book[data-type="manga"] { border-left-color: var(--manga); }
-.book[data-type="essai"] { border-left-color: var(--essai); }
-.book[data-type="autre"] { border-left-color: var(--ink-soft); }
+.book[data-type="bd"] { border-color: var(--bd); }
+.book[data-type="manga"] { border-color: var(--manga); }
+.book[data-type="essai"] { border-color: var(--essai); }
+.book[data-type="autre"] { border-color: var(--ink-soft); }
 .book[data-type="bd"] .book-type-tag { color: var(--bd); border-color: var(--bd); }
 .book[data-type="manga"] .book-type-tag { color: var(--manga); border-color: var(--manga); }
 .book[data-type="essai"] .book-type-tag { color: var(--essai); border-color: var(--essai); }
 .book[data-type="autre"] .book-type-tag { color: var(--ink-soft); border-color: var(--ink-soft); }
+
+/* Couleur d'accent (façon "couleur de faction") des pastilles posées sur la
+   couverture et du badge de type, réutilisant les mêmes teintes que la
+   bande latérale et l'étiquette de type — un seul jeu de couleurs par type
+   pour toute la carte, comme les couleurs de carte d'un jeu de figurines. */
+.book-note-badge,
+.book-read-flag,
+.book-type-corner { background: var(--roman); }
+.book-tome-badge { border-color: var(--roman); }
+.book[data-type="bd"] .book-note-badge,
+.book[data-type="bd"] .book-read-flag,
+.book[data-type="bd"] .book-type-corner { background: var(--bd); }
+.book[data-type="bd"] .book-tome-badge { border-color: var(--bd); }
+.book[data-type="manga"] .book-note-badge,
+.book[data-type="manga"] .book-read-flag,
+.book[data-type="manga"] .book-type-corner { background: var(--manga); }
+.book[data-type="manga"] .book-tome-badge { border-color: var(--manga); }
+.book[data-type="essai"] .book-note-badge,
+.book[data-type="essai"] .book-read-flag,
+.book[data-type="essai"] .book-type-corner { background: var(--essai); }
+.book[data-type="essai"] .book-tome-badge { border-color: var(--essai); }
+.book[data-type="autre"] .book-note-badge,
+.book[data-type="autre"] .book-read-flag,
+.book[data-type="autre"] .book-type-corner { background: var(--ink-soft); }
+.book[data-type="autre"] .book-tome-badge { border-color: var(--ink-soft); }
 
 .shelf.list-view .book {
   flex-direction: row;
@@ -274,22 +298,82 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   padding: 12px 14px 12px 10px;
 }
 
+.book-cover-wrap { position: relative; flex-shrink: 0; }
 .book-cover {
-  flex-shrink: 0;
+  display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 0;
   background: var(--paper-raised);
   border: none;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid var(--roman);
 }
+.book[data-type="bd"] .book-cover { border-bottom-color: var(--bd); }
+.book[data-type="manga"] .book-cover { border-bottom-color: var(--manga); }
+.book[data-type="essai"] .book-cover { border-bottom-color: var(--essai); }
+.book[data-type="autre"] .book-cover { border-bottom-color: var(--ink-soft); }
+.shelf.list-view .book-cover-wrap { width: 40px; height: 58px; }
 .shelf.list-view .book-cover {
-  width: 40px;
-  height: 58px;
+  width: 100%;
+  height: 100%;
   aspect-ratio: unset;
   border-radius: 2px;
   border: 1px solid var(--line);
+}
+
+/* Pastille de note en losange, haut-gauche de la couverture (vue grille). */
+.book-note-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 34px;
+  height: 34px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: #10151C;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,.5);
+}
+.book-note-badge small { display: block; font-size: 6px; font-weight: 600; opacity: .75; }
+
+/* Fanion "Lu" + numéro de tome, haut-droite de la couverture (vue grille) —
+   regroupés dans un même conteneur empilé pour ne jamais se chevaucher,
+   qu'un seul ou les deux soient présents. */
+.book-cover-topright {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.book-read-flag {
+  color: #10151C;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 3px 7px 4px;
+  border-radius: 0 0 4px 4px;
+}
+.book-tome-badge {
+  background: rgba(11,15,20,.82);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .book-content {
@@ -307,7 +391,17 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   padding: 0;
 }
 
-.book-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.book-top { display: flex; flex-direction: column; gap: 4px; }
+/* Trait de séparation en bloc vide dédié plutôt qu'en border-bottom d'un
+   élément contenant du texte : un élément qui doit aussi contenir du texte
+   centré/cliquable (titre, auteur) résiste à width:100% dans ce contexte, un
+   simple bloc sans contenu, lui, prend toujours toute la largeur. */
+/* .book-content espace déjà ses enfants de 6px (gap) : une petite marge ici
+   suffit à aérer un peu plus autour du trait sans cumuler les deux. */
+/* Marges négatives égales au padding horizontal de .book-content (14px) pour
+   que le trait aille jusqu'à la bordure colorée de la carte plutôt que de
+   s'arrêter au même retrait que le texte. */
+.book-divider { height: 1px; background: rgba(255,255,255,.18); margin: 2px -14px; }
 .shelf.list-view .book-top {
   flex-direction: column;
   align-items: flex-start;
@@ -315,6 +409,7 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   flex: 1.4;
   min-width: 0;
 }
+.shelf.list-view .book-divider { display: none; }
 .book-type-tag {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -328,24 +423,57 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 }
 .book-title {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 16px;
   line-height: 1.25;
   margin: 0;
   color: var(--ink);
-  text-align: justify;
-  text-align-last: left;
+  text-transform: uppercase;
+  text-align: center;
 }
-.shelf.list-view .book-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.book-author { font-size: 13px; color: var(--ink-soft); margin: 0; }
-.book-author-link { cursor: pointer; width: fit-content; }
+.shelf.list-view .book-title { font-size: 15px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.book-author {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--roman);
+  margin: 0;
+}
+.book[data-type="bd"] .book-author { color: var(--bd); }
+.book[data-type="manga"] .book-author { color: var(--manga); }
+.book[data-type="essai"] .book-author { color: var(--essai); }
+.book[data-type="autre"] .book-author { color: var(--ink-soft); }
+.shelf.list-view .book-author { text-align: left; text-transform: none; letter-spacing: normal; font-family: var(--font-body); font-size: 13px; color: var(--ink-mid); }
+.book-author-link { cursor: pointer; width: fit-content; margin: 0 auto; }
+.shelf.list-view .book-author-link { margin: 0; }
 .book-author-link:hover { color: var(--brass); text-decoration: underline; }
 .book-series { font-size: 12px; color: var(--ink-soft); margin: 0; }
-.book-genre { font-size: 12px; color: var(--ink-soft); font-style: italic; margin: 0; }
-.shelf.list-view .book-genre,
+.book-location { font-size: 11px; color: var(--ink-soft); margin: 0; }
+.book-info-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.book-info-row .book-location { margin: 0; }
+
+/* Genres en étiquettes (façon mots-clés de faction) plutôt qu'une ligne de
+   texte, à l'italienne d'une carte à collectionner. */
+.book-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.book-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.shelf.list-view .book-tags,
 .shelf.list-view .book-series,
-.shelf.list-view .book-location,
-.shelf.list-view .book-owner { display: none; }
+.shelf.list-view .book-info-row { display: none; }
 
 .book-meta {
   margin-top: auto;
@@ -357,20 +485,50 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   /* .book-meta est un frère de .book-content, pas un enfant : sans ce
      padding horizontal, "Non lu" partait du bord de la carte au lieu de
      s'aligner avec le titre/genre juste au-dessus (qui, eux, héritent du
-     padding de .book-content). */
-  padding: 8px 14px 0;
-  border-top: 1px dashed var(--line);
+     padding de .book-content). Fond plus sombre pour détacher le pied de
+     carte du reste, jusqu'au bord bas de la carte (.book n'a plus de
+     padding-bottom propre, c'est ce bloc qui le porte maintenant). */
+  padding: 8px 14px 12px;
+  background: rgba(0,0,0,.22);
+  border-top: 1px solid var(--line);
 }
-.book-meta-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+/* En vue grille, le type et la note ont leur propre badge sur la carte (voir
+   .book-type-corner et .book-note-badge) : ce repli texte ne sert qu'en vue
+   liste, où la couverture est trop petite pour ces pastilles. */
+.book-meta-right-group { display: flex; align-items: center; gap: 8px; }
+.book-meta-right { display: none; }
 .shelf.list-view .book-meta {
   margin-top: 0;
   border-top: none;
   padding: 0;
+  background: none;
   flex: 0 0 auto;
   gap: 14px;
 }
-.shelf.list-view .book-meta-right { flex-direction: row; align-items: center; gap: 8px; }
+.shelf.list-view .book-meta-right { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .book-note { font-family: var(--font-mono); color: var(--brass); font-weight: 500; }
+
+/* Badge de type, dans le flux normal du pied de carte (vue grille) — se
+   positionnait avant en absolu par rapport à toute la carte, ce qui le
+   faisait chevaucher la ligne propriétaire/emplacement sur les fiches avec
+   peu de contenu (rien ne garantit alors que le contenu de .book-content
+   s'étende jusqu'en bas). Dans le flux du pied de carte, il ne peut plus
+   chevaucher quoi que ce soit. */
+.book-type-corner {
+  color: #10151C;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.5);
+  flex-shrink: 0;
+}
+.shelf.list-view .book-type-corner,
+.shelf.list-view .book-note-badge,
+.shelf.list-view .book-cover-topright { display: none; }
 
 .quick-acquire-btn {
   width: 100%;
@@ -385,9 +543,19 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   cursor: pointer;
 }
 .quick-acquire-btn:hover { background: var(--forest); color: #0E1712; }
-.book-status { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.book-status.lu { color: var(--forest); font-weight: 600; }
-.book-read-date { color: var(--ink-soft); font-weight: 400; font-size: 11px; }
+.book-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.book-status.lu { color: var(--forest); }
+.book-read-date { color: var(--ink-soft); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 10px; }
 .book-lent {
   font-size: 11px;
   color: var(--burgundy);
@@ -406,11 +574,8 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
   background: rgba(208,166,63,.12);
   border-radius: 2px;
   padding: 2px 6px;
-  margin-top: 2px;
-  align-self: flex-start;
   white-space: nowrap;
 }
-.shelf.list-view .book-owner { margin-top: 0; }
 
 .empty-state {
   text-align: center;
