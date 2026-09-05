@@ -85,11 +85,18 @@ img.brand-mark {
 }
 .brand h1 {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 22px;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 24px;
   margin: 0;
-  letter-spacing: 0.2px;
-  color: #F5F1E6;
+  letter-spacing: 0.3px;
+  /* Effet "lettrage doré" façon titre gravé sur un dos de livre, plutôt
+     qu'un simple blanc cassé plat. */
+  background: linear-gradient(120deg, #F5F1E6 0%, #E8C877 45%, #F5F1E6 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 1px 3px rgba(0,0,0,.35);
 }
 
 .stats { display: flex; gap: 22px; }
