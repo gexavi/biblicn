@@ -10,6 +10,8 @@
   --burgundy: #D97867;
   --roman: #57A181;
   --bd: #D6924F;
+  --manga: #3987E5;
+  --essai: #9085E9;
   --topbar-blue: #0E2A4D;
   --topbar-blue-deep: #0A1F3B;
   --radius: 3px;
@@ -234,6 +236,9 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 }
 .book:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.4), 0 12px 26px rgba(0,0,0,.3); }
 .book[data-type="bd"] { border-left-color: var(--bd); }
+.book[data-type="manga"] { border-left-color: var(--manga); }
+.book[data-type="essai"] { border-left-color: var(--essai); }
+.book[data-type="autre"] { border-left-color: var(--ink-soft); }
 
 .shelf.list-view .book {
   flex-direction: row;
