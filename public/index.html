@@ -45,6 +45,7 @@
 
 <div class="toolbar">
   <input type="search" id="searchInput" placeholder="Rechercher un titre, un auteur, une série, un ISBN…" class="search-input">
+  <button class="btn btn-ghost btn-bordered" id="clearFiltersBtn" type="button">✕ Réinitialiser les filtres</button>
   <button class="btn btn-bordered toolbar-toggle-btn" id="toggleFiltersBtn" type="button" aria-expanded="false" aria-controls="toolbarFilters">
     <span id="toggleFiltersLabel">▾ Filtres</span>
     <span class="filter-badge" id="filterBadge" hidden>0</span>
@@ -83,7 +84,6 @@
       <option value="12">12/20 et plus</option>
       <option value="10">10/20 et plus</option>
     </select>
-    <button class="btn btn-ghost btn-bordered" id="clearFiltersBtn" type="button">✕ Réinitialiser les filtres</button>
   </div>
   <select id="sortBy" class="select">
     <option value="recent">Récemment ajoutés</option>

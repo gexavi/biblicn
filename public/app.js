@@ -257,6 +257,9 @@ function updateFilterToggleUI() {
   const expanded = !toolbarFilters.classList.contains('toolbar-filters-collapsed');
   toggleFiltersBtn.setAttribute('aria-expanded', String(expanded));
   $('#toggleFiltersLabel').textContent = expanded ? '▴ Filtres' : '▾ Filtres';
+  // Signale visuellement qu'un ou plusieurs filtres sont actifs et peuvent
+  // être réinitialisés, plutôt que de laisser le bouton toujours neutre.
+  $('#clearFiltersBtn').classList.toggle('active', count > 0);
 }
 function setFiltersCollapsed(collapsed) {
   toolbarFilters.classList.toggle('toolbar-filters-collapsed', collapsed);
@@ -312,25 +315,26 @@ function renderBookCard(book) {
   const isSold = book.status === 'revendu';
 
   // Bandeau sur la couverture (vue grille, façon carte à collectionner) :
-  // pastille de note en losange en haut à gauche, fanion "Lu" et numéro de
-  // tome en haut à droite. Repli en vue liste : voir metaRightFallback plus
-  // bas, la couverture y étant bien trop petite pour ces pastilles.
+  // pastille de note en losange en haut à gauche, fanion "Lu" en haut à
+  // droite, pastille de tome en bas à droite. Repli en vue liste : voir
+  // metaRightFallback plus bas, la couverture y étant bien trop petite pour
+  // ces pastilles.
   const noteBadgeHtml = book.note != null
     ? `<div class="book-note-badge"><span>${book.note}<small>/20</small></span></div>`
     : '';
-  const readFlagHtml = book.lu ? '<div class="book-read-flag">Lu</div>' : '';
+  const readFlagHtml = book.lu
+    ? `<div class="book-cover-topright"><div class="book-read-flag">Lu</div></div>`
+    : '';
   const tomeBadgeHtml = book.series_number
     ? `<div class="book-tome-badge">T.${escapeHtml(book.series_number)}</div>`
     : '';
-  const topRightHtml = (readFlagHtml || tomeBadgeHtml)
-    ? `<div class="book-cover-topright">${readFlagHtml}${tomeBadgeHtml}</div>`
-    : '';
 
   // Genres en étiquettes plutôt qu'en une seule ligne de texte, façon
-  // mots-clés de faction sur une carte à collectionner.
+  // mots-clés de faction sur une carte à collectionner. Chacune filtre sur
+  // ce genre précis au clic.
   const genres = (book.genre || '').split(',').map(g => g.trim()).filter(Boolean);
   const tagsHtml = genres.length
-    ? `<div class="book-tags">${genres.map(g => `<span class="book-tag">${escapeHtml(g)}</span>`).join('')}</div>`
+    ? `<div class="book-tags">${genres.map(g => `<span class="book-tag book-genre-link" data-genre="${escapeHtml(g)}">${escapeHtml(g)}</span>`).join('')}</div>`
     : '';
 
   // Le pied de carte ne montre "Lu" qu'une fois le livre lu — inutile de
@@ -341,20 +345,25 @@ function renderBookCard(book) {
   const readDateHtml = book.lu && book.read_date ? ` <span class="book-read-date">le ${formatDateFr(book.read_date)}</span>` : '';
   const statusHtml = book.lu ? `<span class="book-status lu">✓ Lu${readDateHtml}</span>` : '<span></span>';
   const noteHtmlInline = book.note != null ? `<span class="book-note">${book.note}/20</span>` : '';
-  const metaRightFallback = `<span class="book-meta-right"><span class="book-type-tag">${typeLabel(book.type)}</span>${noteHtmlInline}</span>`;
+  const metaRightFallback = `<span class="book-meta-right"><span class="book-type-tag book-type-link" data-type-filter="${escapeHtml(book.type)}">${typeLabel(book.type)}</span>${noteHtmlInline}</span>`;
   // Le badge de type vit ici, dans le flux normal du pied de carte, plutôt
   // qu'en position absolue par-dessus la carte : ça évitait un chevauchement
   // avec la ligne propriétaire/emplacement sur les fiches à peu de contenu.
   const metaHtml = isWishlist
     ? `<button class="quick-acquire-btn" type="button">✓ Marquer comme acquis</button>`
-    : `${statusHtml}<span class="book-meta-right-group">${metaRightFallback}<span class="book-type-corner">${typeLabel(book.type)}</span></span>`;
+    : `${statusHtml}<span class="book-meta-right-group">${metaRightFallback}<span class="book-type-corner book-type-link" data-type-filter="${escapeHtml(book.type)}">${typeLabel(book.type)}</span></span>`;
 
   const lentHtml = !isSold && book.lent_to
     ? `<div class="book-lent">Prêté à ${escapeHtml(book.lent_to)}</div>`
     : '';
   const ownerIcon = isWishlist ? '🎁' : isSold ? '📦' : '📚';
-  const ownerHtml = book.owner
-    ? `<div class="book-owner">${ownerIcon} ${escapeHtml(book.owner)}</div>`
+  // Un livre en copropriété a plusieurs noms séparés par des virgules : on
+  // les rend cliquables individuellement (chacun filtre sur son propre nom),
+  // pas sur la chaîne combinée qui ne correspondrait à aucune option du
+  // filtre "Appartient à".
+  const ownerNames = (book.owner || '').split(',').map(o => o.trim()).filter(Boolean);
+  const ownerHtml = ownerNames.length
+    ? `<div class="book-owner">${ownerIcon} ${ownerNames.map(o => `<span class="book-owner-link" data-owner="${escapeHtml(o)}">${escapeHtml(o)}</span>`).join(', ')}</div>`
     : '';
   const locationHtml = (!isWishlist && !isSold && book.location)
     ? `<p class="book-location">📍 ${escapeHtml(book.location)}</p>`
@@ -366,7 +375,7 @@ function renderBookCard(book) {
     ? `<div class="book-info-row">${ownerHtml || '<span></span>'}${locationHtml || '<span></span>'}</div>`
     : '';
   const seriesHtml = book.series
-    ? `<p class="book-series">📖 ${escapeHtml(book.series)}</p>`
+    ? `<p class="book-series book-series-link" data-series="${escapeHtml(book.series)}">📖 ${escapeHtml(book.series)}</p>`
     : '';
 
   el.innerHTML = `
@@ -374,7 +383,8 @@ function renderBookCard(book) {
       <img class="book-cover" src="${escapeHtml(coverSrc(book))}" alt="" loading="lazy"
         onerror="this.onerror=null;this.src='${PLACEHOLDER_COVER}';">
       ${noteBadgeHtml}
-      ${topRightHtml}
+      ${readFlagHtml}
+      ${tomeBadgeHtml}
     </div>
     <div class="book-content">
       <div class="book-top">
@@ -409,11 +419,60 @@ function renderBookCard(book) {
     });
   }
 
+  const seriesLinkEl = el.querySelector('.book-series-link');
+  if (seriesLinkEl) {
+    seriesLinkEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterBySeries(seriesLinkEl.dataset.series);
+    });
+  }
+
+  el.querySelectorAll('.book-owner-link').forEach((ownerLinkEl) => {
+    ownerLinkEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterByOwner(ownerLinkEl.dataset.owner);
+    });
+  });
+
+  el.querySelectorAll('.book-genre-link').forEach((genreLinkEl) => {
+    genreLinkEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterByGenre(genreLinkEl.dataset.genre);
+    });
+  });
+
+  el.querySelectorAll('.book-type-link').forEach((typeLinkEl) => {
+    typeLinkEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterByType(typeLinkEl.dataset.typeFilter);
+    });
+  });
+
   return el;
 }
 
+// Filtres déclenchés en cliquant directement sur un champ de la fiche —
+// même principe pour tous : renseigner le menu déroulant correspondant et
+// relancer le chargement, plutôt que de dupliquer la logique de filtrage
+// déjà gérée par loadBooks().
 function filterByAuthor(author) {
   $('#searchInput').value = author;
+  loadBooks();
+}
+function filterBySeries(series) {
+  $('#filterSeries').value = series;
+  loadBooks();
+}
+function filterByOwner(owner) {
+  $('#filterOwner').value = owner;
+  loadBooks();
+}
+function filterByGenre(genre) {
+  $('#filterGenre').value = genre;
+  loadBooks();
+}
+function filterByType(type) {
+  $('#filterType').value = type;
   loadBooks();
 }
 
