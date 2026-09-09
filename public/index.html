@@ -166,17 +166,6 @@
           <input type="text" id="fieldPublisher" placeholder="Gallimard, Bragelonne…">
         </label>
         <label class="field">
-          <span>Note /20</span>
-          <input type="number" id="fieldNote" min="0" max="20" step="1">
-        </label>
-        <label class="field field-checkbox">
-          <input type="checkbox" id="fieldLu">
-          <span>Lu</span>
-          <span id="readDateWrap" class="read-date-wrap" hidden>
-            le <input type="date" id="fieldReadDate" class="read-date-input">
-          </span>
-        </label>
-        <label class="field">
           <span>Rangé dans</span>
           <input type="text" id="fieldLocation" placeholder="Étagère salon, carton 3…">
         </label>
@@ -188,6 +177,27 @@
           <span>Appartient à</span>
           <input type="text" id="fieldOwner" placeholder="Nom de la personne">
         </label>
+        <div class="field field-full">
+          <span>Lu, date et note</span>
+          <div class="owner-reads" id="ownerReads">
+            <div class="owner-read-row" id="ownerReadRow1">
+              <strong class="owner-read-name" id="ownerReadName1"></strong>
+              <label class="owner-read-lu"><input type="checkbox" id="ownerRead1Lu"> Lu</label>
+              <span id="ownerRead1DateWrap" class="read-date-wrap" hidden>
+                le <input type="date" id="ownerRead1Date" class="read-date-input">
+              </span>
+              <input type="number" id="ownerRead1Note" min="0" max="20" step="1" placeholder="Note /20" class="owner-read-note">
+            </div>
+            <div class="owner-read-row" id="ownerReadRow2" hidden>
+              <strong class="owner-read-name" id="ownerReadName2"></strong>
+              <label class="owner-read-lu"><input type="checkbox" id="ownerRead2Lu"> Lu</label>
+              <span id="ownerRead2DateWrap" class="read-date-wrap" hidden>
+                le <input type="date" id="ownerRead2Date" class="read-date-input">
+              </span>
+              <input type="number" id="ownerRead2Note" min="0" max="20" step="1" placeholder="Note /20" class="owner-read-note">
+            </div>
+          </div>
+        </div>
         <label class="field field-full">
           <span>URL de couverture (optionnel)</span>
           <input type="text" id="fieldCover" placeholder="https://... — utile si la recherche auto n'en trouve pas">

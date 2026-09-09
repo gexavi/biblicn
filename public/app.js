@@ -192,9 +192,15 @@ async function loadSeriesOptions() {
   if (series.includes(current)) select.value = current;
 }
 
+// Mémorisée pour la fiche d'édition : les blocs "Lu, date et note" y
+// affichent toujours les propriétaires connus en base, pas seulement ceux
+// du champ "Appartient à" de ce livre précis (voir ownerReadNames plus bas).
+let knownOwners = [];
+
 async function loadOwnerOptions() {
   const res = await fetch('/api/owners?status=' + currentStatus);
   const owners = await res.json();
+  knownOwners = owners;
   const select = $('#filterOwner');
   const current = select.value;
   select.innerHTML = '<option value="">Appartient à (tous)</option>' +
@@ -514,14 +520,57 @@ function updateModalCoverPreview() {
 }
 
 // ---------- Modale ----------
-function toggleReadDateVisibility() {
-  const checked = $('#fieldLu').checked;
-  $('#readDateWrap').hidden = !checked;
-  if (checked && !$('#fieldReadDate').value) {
-    $('#fieldReadDate').value = new Date().toISOString().slice(0, 10);
-  }
+
+// Lecture par personne : deux blocs fixes affichant toujours jusqu'à 2 noms
+// (voir ownerReadNames plus bas — "Appartient à" reste un champ texte unique,
+// #fieldOwner). Si aucun propriétaire n'est encore connu en base, le bloc 1
+// sert de repli générique (pas de nom affiché).
+function ownerReadRow(i) {
+  return {
+    row: $(`#ownerReadRow${i}`),
+    name: $(`#ownerReadName${i}`),
+    lu: $(`#ownerRead${i}Lu`),
+    dateWrap: $(`#ownerRead${i}DateWrap`),
+    date: $(`#ownerRead${i}Date`),
+    note: $(`#ownerRead${i}Note`)
+  };
 }
-$('#fieldLu').addEventListener('change', toggleReadDateVisibility);
+const ownerReadRows = [ownerReadRow(1), ownerReadRow(2)];
+
+function toggleOwnerReadDate(row) {
+  const checked = row.lu.checked;
+  row.dateWrap.hidden = !checked;
+  if (checked && !row.date.value) row.date.value = new Date().toISOString().slice(0, 10);
+}
+ownerReadRows.forEach(row => row.lu.addEventListener('change', () => toggleOwnerReadDate(row)));
+
+// Toujours jusqu'à 2 noms : d'abord le(s) propriétaire(s) de CE livre (champ
+// "Appartient à", dans l'ordre saisi), puis les autres propriétaires connus
+// en base — pour permettre à quelqu'un qui ne possède pas le livre de noter
+// qu'il/elle l'a quand même lu.
+function ownerReadNames() {
+  const bookOwners = $('#fieldOwner').value.split(',').map(o => o.trim()).filter(Boolean);
+  const others = knownOwners.filter(o => !bookOwners.includes(o));
+  return [...bookOwners, ...others].slice(0, 2);
+}
+
+function updateOwnerReadRows() {
+  const names = ownerReadNames();
+  ownerReadRows[0].name.textContent = names[0] || '';
+  ownerReadRows[1].name.textContent = names[1] || '';
+  ownerReadRows[1].row.hidden = !names[1];
+  return names;
+}
+$('#fieldOwner').addEventListener('input', updateOwnerReadRows);
+
+function resetOwnerReadRows() {
+  ownerReadRows.forEach(row => {
+    row.lu.checked = false;
+    row.date.value = '';
+    row.note.value = '';
+    row.dateWrap.hidden = true;
+  });
+}
 
 function openAddModal() {
   rememberFocus();
@@ -529,7 +578,6 @@ function openAddModal() {
   $('#bookId').value = '';
   $('#fieldIsbn').value = '';
   $('#fieldCover').value = '';
-  $('#fieldReadDate').value = '';
   $('#fieldPublisher').value = '';
   $('#fieldSeries').value = '';
   $('#fieldSeriesNumber').value = '';
@@ -546,7 +594,8 @@ function openAddModal() {
   $('#unmarkSoldBtn').hidden = true;
   $('#secondhandLinks').hidden = true;
   modalBackdrop.hidden = false;
-  toggleReadDateVisibility();
+  resetOwnerReadRows();
+  updateOwnerReadRows();
   setTimeout(() => $('#isbnInput').focus(), 50);
 }
 
@@ -561,9 +610,6 @@ function openEditModal(book) {
   $('#fieldSeries').value = book.series || '';
   $('#fieldSeriesNumber').value = book.series_number || '';
   $('#fieldPublisher').value = book.publisher || '';
-  $('#fieldNote').value = book.note != null ? book.note : '';
-  $('#fieldLu').checked = !!book.lu;
-  $('#fieldReadDate').value = book.read_date || '';
   $('#fieldLocation').value = book.location || '';
   $('#fieldLentTo').value = book.lent_to || '';
   $('#fieldOwner').value = book.owner || '';
@@ -573,6 +619,29 @@ function openEditModal(book) {
   $('#isbnInput').value = book.isbn || '';
   isbnStatus.textContent = '';
   isbnStatus.className = 'isbn-status';
+
+  resetOwnerReadRows();
+  const names = updateOwnerReadRows();
+  const reads = Array.isArray(book.reads) ? book.reads : [];
+  if (names.length) {
+    names.forEach((name, i) => {
+      const read = reads.find(r => r.owner === name);
+      const row = ownerReadRows[i];
+      row.lu.checked = !!read;
+      row.date.value = (read && read.read_date) || '';
+      row.note.value = (read && read.note != null) ? read.note : '';
+      toggleOwnerReadDate(row);
+    });
+  } else {
+    // Aucun propriétaire connu en base (installation neuve) : repli
+    // générique sur le lu/date/note partagé du livre.
+    const row = ownerReadRows[0];
+    row.lu.checked = !!book.lu;
+    row.date.value = book.read_date || '';
+    row.note.value = book.note != null ? book.note : '';
+    toggleOwnerReadDate(row);
+  }
+
   modalTitle.textContent = book.status === 'souhaite' ? 'Modifier le souhait'
     : book.status === 'revendu' ? 'Livre revendu' : 'Modifier le livre';
   deleteBtn.hidden = false;
@@ -582,7 +651,6 @@ function openEditModal(book) {
   updateSecondhandLinks(book);
   modalBackdrop.hidden = false;
   setTimeout(() => $('#isbnInput').focus(), 50);
-  toggleReadDateVisibility();
   updateModalCoverPreview();
 }
 
@@ -722,6 +790,20 @@ async function doIsbnLookup() {
 bookForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = $('#bookId').value;
+  const names = ownerReadNames();
+  const reads = names.map((name, i) => {
+    const row = ownerReadRows[i];
+    return {
+      owner: name,
+      lu: row.lu.checked,
+      read_date: row.lu.checked ? (row.date.value || null) : null,
+      note: row.note.value === '' ? null : Number(row.note.value)
+    };
+  });
+  // Livre sans propriétaire : lu/note/read_date viennent directement du
+  // bloc 1 (repli générique). Sinon le serveur recalcule ces trois champs à
+  // partir de `reads` — les valeurs envoyées ici ne servent qu'en secours.
+  const fallbackRow = ownerReadRows[0];
   const payload = {
     title: $('#fieldTitle').value.trim(),
     author: $('#fieldAuthor').value.trim(),
@@ -730,9 +812,10 @@ bookForm.addEventListener('submit', async (e) => {
     series: $('#fieldSeries').value.trim(),
     series_number: $('#fieldSeriesNumber').value.trim(),
     publisher: $('#fieldPublisher').value.trim(),
-    note: $('#fieldNote').value === '' ? null : Number($('#fieldNote').value),
-    lu: $('#fieldLu').checked,
-    read_date: $('#fieldLu').checked ? ($('#fieldReadDate').value || null) : null,
+    note: fallbackRow.note.value === '' ? null : Number(fallbackRow.note.value),
+    lu: fallbackRow.lu.checked,
+    read_date: fallbackRow.lu.checked ? (fallbackRow.date.value || null) : null,
+    reads,
     location: $('#fieldLocation').value.trim(),
     lent_to: $('#fieldLentTo').value.trim(),
     owner: $('#fieldOwner').value.trim(),
@@ -1150,12 +1233,16 @@ function renderYearChart(items) {
 }
 
 function renderOwnerCard(owner) {
+  const avgNoteHtml = owner.avgNote != null
+    ? `<span class="owner-card-note">★ ${owner.avgNote}/20 en moyenne</span>`
+    : '';
   return `
     <div class="owner-card">
       <div class="owner-card-head">
         <h3>${escapeHtml(owner.name)}</h3>
         <span class="owner-card-total">${owner.total} livre${owner.total > 1 ? 's' : ''}</span>
       </div>
+      ${avgNoteHtml}
       ${renderGenreDonut(owner.byGenre)}
       ${renderYearChart(owner.byYear)}
     </div>`;

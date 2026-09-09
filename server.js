@@ -51,6 +51,9 @@ if (!fs.existsSync(COVERS_DIR)) {
 
 const db = new Database(path.join(DATA_DIR, 'bibliotheque.db'));
 db.pragma('journal_mode = WAL');
+// Nécessaire pour que `ON DELETE CASCADE` (book_owner_reads -> books) soit
+// vraiment appliqué : SQLite ignore les clés étrangères par défaut.
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS books (
@@ -94,6 +97,35 @@ if (!existingColumns.includes('series_number')) {
   // Stocké en texte plutôt qu'en entier : certaines séries numérotent des
   // hors-séries ou demi-tomes ("3.5", "HS1"), pas seulement des entiers.
   db.exec('ALTER TABLE books ADD COLUMN series_number TEXT');
+}
+
+// Lecture par propriétaire : `owner` reste un champ texte unique (liste de
+// noms séparés par des virgules), mais "lu"/date/note sont désormais suivis
+// par personne plutôt que partagés pour tout le livre. `books.lu`/`note`/
+// `read_date` restent en base comme agrégat (lu = au moins un propriétaire
+// l'a lu, note = moyenne, read_date = lecture la plus récente) : c'est ce
+// que les filtres/tri/badge de carte continuent de lire sans changement.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS book_owner_reads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    owner TEXT NOT NULL,
+    read_date TEXT,
+    note INTEGER,
+    UNIQUE(book_id, owner)
+  )
+`);
+// Backfill unique : si la table est vide, on répartit le lu/date/note
+// partagé de chaque livre déjà marqué "lu" sur chacun de ses propriétaires.
+// Ensuite la table n'est plus jamais vide (sauf base neuve sans livre lu),
+// donc ce bloc ne s'exécute plus qu'une fois dans la vie de l'installation.
+if (db.prepare('SELECT COUNT(*) c FROM book_owner_reads').get().c === 0) {
+  const luBooks = db.prepare("SELECT id, owner, read_date, note FROM books WHERE lu = 1").all();
+  const insertRead = db.prepare('INSERT OR IGNORE INTO book_owner_reads (book_id, owner, read_date, note) VALUES (?, ?, ?, ?)');
+  for (const b of luBooks) {
+    const names = (b.owner || '').split(',').map(o => o.trim()).filter(Boolean);
+    for (const name of names) insertRead.run(b.id, name, b.read_date, b.note);
+  }
 }
 
 db.exec(`
@@ -508,6 +540,50 @@ app.get('/api/isbn/:isbn', async (req, res) => {
 });
 
 // ---------- CRUD Livres ----------
+
+const readsByBookStmt = db.prepare('SELECT owner, read_date, note FROM book_owner_reads WHERE book_id = ?');
+function attachReads(book) {
+  if (book) book.reads = readsByBookStmt.all(book.id);
+  return book;
+}
+
+// Remplace les lectures par personne d'un livre à partir du tableau `reads`
+// envoyé par le client ([{owner, lu, read_date, note}, ...]), puis recalcule
+// l'agrégat stocké sur `books` (lu/note/read_date) à partir de ces lectures :
+// lu si au moins une personne l'a lu, note = moyenne des notes données,
+// read_date = lecture la plus récente. C'est cet agrégat que les filtres, le
+// tri et le badge de la carte continuent de lire tel quel. `owner` n'a pas à
+// posséder le livre pour pouvoir être marqué "lu" dessus (ex. un livre
+// possédé par Alice mais aussi lu par Bob) — voir ownerReadNames côté client.
+// Retourne `null` (sans rien changer) si le client n'a pas envoyé de tableau
+// `reads` non vide — dans ce cas les champs lu/note/read_date d'origine,
+// déjà écrits par l'appelant, font foi (installation neuve sans propriétaire
+// connu en base).
+function syncOwnerReads(bookId, reads) {
+  if (!Array.isArray(reads) || !reads.length) return null;
+
+  db.prepare('DELETE FROM book_owner_reads WHERE book_id = ?').run(bookId);
+  const insert = db.prepare('INSERT INTO book_owner_reads (book_id, owner, read_date, note) VALUES (?, ?, ?, ?)');
+  const kept = [];
+  for (const r of reads) {
+    const name = String(r.owner || '').trim();
+    if (!name || !r.lu) continue;
+    const note = r.note != null && r.note !== '' ? Number(r.note) : null;
+    const read_date = r.read_date || null;
+    insert.run(bookId, name, read_date, note);
+    kept.push({ note, read_date });
+  }
+
+  if (!kept.length) return { lu: 0, note: null, read_date: null };
+  const notes = kept.map(r => r.note).filter(n => n != null);
+  const dates = kept.map(r => r.read_date).filter(Boolean).sort();
+  return {
+    lu: 1,
+    note: notes.length ? Math.round(notes.reduce((a, b) => a + b, 0) / notes.length) : null,
+    read_date: dates.length ? dates[dates.length - 1] : null
+  };
+}
+
 app.get('/api/books', (req, res) => {
   const { q, type, genre, lu, sort, publisher, owner, status, minNote, series } = req.query;
   let query = 'SELECT * FROM books WHERE 1=1';
@@ -560,13 +636,13 @@ app.get('/api/books', (req, res) => {
   query += ' ORDER BY ' + (sortMap[sort] || sortMap.recent);
 
   const rows = db.prepare(query).all(...params);
-  res.json(rows);
+  res.json(rows.map(attachReads));
 });
 
 app.get('/api/books/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Livre non trouvé' });
-  res.json(row);
+  res.json(attachReads(row));
 });
 
 app.post('/api/books', async (req, res) => {
@@ -606,8 +682,14 @@ app.post('/api/books', async (req, res) => {
     }
   }
 
+  const aggregate = syncOwnerReads(bookId, b.reads);
+  if (aggregate) {
+    db.prepare('UPDATE books SET lu = ?, note = ?, read_date = ? WHERE id = ?')
+      .run(aggregate.lu, aggregate.note, aggregate.read_date, bookId);
+  }
+
   const created = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
-  res.status(201).json(created);
+  res.status(201).json(attachReads(created));
 });
 
 app.put('/api/books/:id', async (req, res) => {
@@ -647,8 +729,15 @@ app.put('/api/books/:id', async (req, res) => {
     series: b.series || '',
     series_number: b.series_number || ''
   });
+
+  const aggregate = syncOwnerReads(req.params.id, b.reads);
+  if (aggregate) {
+    db.prepare('UPDATE books SET lu = ?, note = ?, read_date = ? WHERE id = ?')
+      .run(aggregate.lu, aggregate.note, aggregate.read_date, req.params.id);
+  }
+
   const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
-  res.json(updated);
+  res.json(attachReads(updated));
 });
 
 app.delete('/api/books/:id', (req, res) => {
@@ -844,29 +933,55 @@ app.get('/api/stats/owners', (req, res) => {
   // vrai même après l'avoir revendu, donc il continue de compter dans
   // l'historique de lecture (byYear) — d'où l'inclusion des deux statuts ici,
   // avec un filtre différent selon la statistique plus bas.
-  const rows = db.prepare("SELECT owner, genre, lu, read_date, status FROM books WHERE status IN ('possede', 'revendu')").all();
-  const owners = new Map(); // nom -> { total, byGenre: Map, byYear: Map }
+  const rows = db.prepare("SELECT owner, genre, lu, read_date, note, status FROM books WHERE status IN ('possede', 'revendu')").all();
+  // Lectures par propriétaire (une ligne = un propriétaire a lu ce livre, avec
+  // sa propre date et sa propre note) : source pour byYear/avgNote ci-dessous,
+  // bien plus précise que le lu/date/note partagé utilisé avant leur ajout.
+  const reads = db.prepare(`
+    SELECT br.owner, br.read_date, br.note
+    FROM book_owner_reads br
+    JOIN books b ON b.id = br.book_id
+    WHERE b.status IN ('possede', 'revendu')
+  `).all();
+  const owners = new Map(); // nom -> { total, byGenre: Map, byYear: Map, noteSum, noteCount }
 
   const getOwnerEntry = (name) => {
-    if (!owners.has(name)) owners.set(name, { total: 0, byGenre: new Map(), byYear: new Map() });
+    if (!owners.has(name)) owners.set(name, { total: 0, byGenre: new Map(), byYear: new Map(), noteSum: 0, noteCount: 0 });
     return owners.get(name);
   };
   const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 
   for (const row of rows) {
     const ownerNames = (row.owner || '').split(',').map(o => o.trim()).filter(Boolean);
-    const names = ownerNames.length ? ownerNames : ['Sans propriétaire'];
     const genres = (row.genre || '').split(',').map(g => g.trim()).filter(Boolean);
-    const year = (row.lu && row.read_date) ? row.read_date.slice(0, 4) : null;
 
-    for (const name of names) {
-      const entry = getOwnerEntry(name);
+    if (ownerNames.length) {
+      for (const name of ownerNames) {
+        if (row.status === 'possede') {
+          const entry = getOwnerEntry(name);
+          entry.total++;
+          genres.forEach(g => bump(entry.byGenre, g));
+        }
+      }
+    } else {
+      // Livre sans propriétaire renseigné : aucune ligne dans book_owner_reads
+      // à s'y rattacher, donc byYear/note s'appuient ici sur le lu/date/note
+      // partagé du livre, comme avant l'ajout du suivi par personne.
+      const entry = getOwnerEntry('Sans propriétaire');
       if (row.status === 'possede') {
         entry.total++;
         genres.forEach(g => bump(entry.byGenre, g));
       }
-      if (year) bump(entry.byYear, year);
+      if (row.lu && row.read_date) bump(entry.byYear, row.read_date.slice(0, 4));
+      if (row.lu && row.note != null) { entry.noteSum += row.note; entry.noteCount++; }
     }
+  }
+
+  for (const r of reads) {
+    if (!r.owner) continue;
+    const entry = getOwnerEntry(r.owner);
+    if (r.read_date) bump(entry.byYear, r.read_date.slice(0, 4));
+    if (r.note != null) { entry.noteSum += r.note; entry.noteCount++; }
   }
 
   const result = [...owners.entries()]
@@ -879,7 +994,8 @@ app.get('/api/stats/owners', (req, res) => {
       name,
       total: entry.total,
       byGenre: [...entry.byGenre.entries()].sort((a, b) => b[1] - a[1]).map(([genre, count]) => ({ genre, count })),
-      byYear: [...entry.byYear.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([year, count]) => ({ year, count }))
+      byYear: [...entry.byYear.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([year, count]) => ({ year, count })),
+      avgNote: entry.noteCount ? Math.round((entry.noteSum / entry.noteCount) * 10) / 10 : null
     }))
     .sort((a, b) => b.total - a.total);
 
