@@ -549,39 +549,40 @@ function attachReads(book) {
 
 // Remplace les lectures par personne d'un livre à partir du tableau `reads`
 // envoyé par le client ([{owner, lu, read_date, note}, ...]), puis recalcule
-// l'agrégat stocké sur `books` (lu/note/read_date) à partir de ces lectures :
-// lu si au moins une personne l'a lu, note = moyenne des notes données,
-// read_date = lecture la plus récente. C'est cet agrégat que les filtres, le
-// tri et le badge de la carte continuent de lire tel quel. `owner` n'a pas à
-// posséder le livre pour pouvoir être marqué "lu" dessus (ex. un livre
-// possédé par Alice mais aussi lu par Bob) — voir ownerReadNames côté client.
-// Retourne `null` (sans rien changer) si le client n'a pas envoyé de tableau
-// `reads` non vide — dans ce cas les champs lu/note/read_date d'origine,
-// déjà écrits par l'appelant, font foi (installation neuve sans propriétaire
+// l'agrégat stocké sur `books` (lu/note/read_date) à partir de la lecture du
+// PROPRIÉTAIRE PRINCIPAL (1er nom d'"Appartient à") uniquement — pas une
+// moyenne ni la lecture la plus récente tous lecteurs confondus : c'est cet
+// agrégat que les filtres, le tri et la carte continuent de lire tel quel, et
+// la carte doit refléter la lecture de celui à qui le livre appartient, pas
+// celle d'un éventuel second lecteur qui ne le possède pas. `owner` n'a pas à
+// posséder le livre pour être marqué "lu" dessus (ex. un livre possédé par
+// Alice mais aussi lu par Bob) — voir ownerReadNames côté client — mais seule
+// la ligne d'Alice compte alors pour la carte.
+// Retourne `null` (sans rien changer) si le livre n'a pas de propriétaire
+// renseigné ou si le client n'a pas envoyé de tableau `reads` non vide —
+// dans ce cas les champs lu/note/read_date d'origine, déjà écrits par
+// l'appelant, font foi (repli pour une installation neuve sans propriétaire
 // connu en base).
-function syncOwnerReads(bookId, reads) {
+function syncOwnerReads(bookId, ownerField, reads) {
   if (!Array.isArray(reads) || !reads.length) return null;
+  const primaryOwner = (ownerField || '').split(',').map(o => o.trim()).filter(Boolean)[0] || null;
+  if (!primaryOwner) return null;
 
   db.prepare('DELETE FROM book_owner_reads WHERE book_id = ?').run(bookId);
   const insert = db.prepare('INSERT INTO book_owner_reads (book_id, owner, read_date, note) VALUES (?, ?, ?, ?)');
-  const kept = [];
+  let primaryRead = null;
   for (const r of reads) {
     const name = String(r.owner || '').trim();
     if (!name || !r.lu) continue;
     const note = r.note != null && r.note !== '' ? Number(r.note) : null;
     const read_date = r.read_date || null;
     insert.run(bookId, name, read_date, note);
-    kept.push({ note, read_date });
+    if (name === primaryOwner) primaryRead = { note, read_date };
   }
 
-  if (!kept.length) return { lu: 0, note: null, read_date: null };
-  const notes = kept.map(r => r.note).filter(n => n != null);
-  const dates = kept.map(r => r.read_date).filter(Boolean).sort();
-  return {
-    lu: 1,
-    note: notes.length ? Math.round(notes.reduce((a, b) => a + b, 0) / notes.length) : null,
-    read_date: dates.length ? dates[dates.length - 1] : null
-  };
+  return primaryRead
+    ? { lu: 1, note: primaryRead.note, read_date: primaryRead.read_date }
+    : { lu: 0, note: null, read_date: null };
 }
 
 app.get('/api/books', (req, res) => {
@@ -682,7 +683,7 @@ app.post('/api/books', async (req, res) => {
     }
   }
 
-  const aggregate = syncOwnerReads(bookId, b.reads);
+  const aggregate = syncOwnerReads(bookId, b.owner, b.reads);
   if (aggregate) {
     db.prepare('UPDATE books SET lu = ?, note = ?, read_date = ? WHERE id = ?')
       .run(aggregate.lu, aggregate.note, aggregate.read_date, bookId);
@@ -730,7 +731,7 @@ app.put('/api/books/:id', async (req, res) => {
     series_number: b.series_number || ''
   });
 
-  const aggregate = syncOwnerReads(req.params.id, b.reads);
+  const aggregate = syncOwnerReads(req.params.id, b.owner, b.reads);
   if (aggregate) {
     db.prepare('UPDATE books SET lu = ?, note = ?, read_date = ? WHERE id = ?')
       .run(aggregate.lu, aggregate.note, aggregate.read_date, req.params.id);
