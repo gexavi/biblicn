@@ -549,15 +549,15 @@ function attachReads(book) {
 
 // Remplace les lectures par personne d'un livre à partir du tableau `reads`
 // envoyé par le client ([{owner, lu, read_date, note}, ...]), puis recalcule
-// l'agrégat stocké sur `books` (lu/note/read_date) à partir de la lecture du
-// PROPRIÉTAIRE PRINCIPAL (1er nom d'"Appartient à") uniquement — pas une
-// moyenne ni la lecture la plus récente tous lecteurs confondus : c'est cet
-// agrégat que les filtres, le tri et la carte continuent de lire tel quel, et
-// la carte doit refléter la lecture de celui à qui le livre appartient, pas
-// celle d'un éventuel second lecteur qui ne le possède pas. `owner` n'a pas à
-// posséder le livre pour être marqué "lu" dessus (ex. un livre possédé par
-// Alice mais aussi lu par Bob) — voir ownerReadNames côté client — mais seule
-// la ligne d'Alice compte alors pour la carte.
+// l'agrégat stocké sur `books` : lu/read_date viennent uniquement de la
+// lecture du PROPRIÉTAIRE PRINCIPAL (1er nom d'"Appartient à" — la carte doit
+// refléter la lecture de celui à qui le livre appartient, pas celle d'un
+// éventuel second lecteur qui ne le possède pas), tandis que note reste la
+// moyenne de toutes les notes données, propriétaire ou non. C'est cet
+// agrégat que les filtres, le tri et la carte continuent de lire tel quel.
+// `owner` n'a pas à posséder le livre pour être marqué "lu" dessus (ex. un
+// livre possédé par Alice mais aussi lu par Bob) — voir ownerReadNames côté
+// client — mais seule la ligne d'Alice compte pour lu/read_date.
 // Retourne `null` (sans rien changer) si le livre n'a pas de propriétaire
 // renseigné ou si le client n'a pas envoyé de tableau `reads` non vide —
 // dans ce cas les champs lu/note/read_date d'origine, déjà écrits par
@@ -571,18 +571,21 @@ function syncOwnerReads(bookId, ownerField, reads) {
   db.prepare('DELETE FROM book_owner_reads WHERE book_id = ?').run(bookId);
   const insert = db.prepare('INSERT INTO book_owner_reads (book_id, owner, read_date, note) VALUES (?, ?, ?, ?)');
   let primaryRead = null;
+  const notes = [];
   for (const r of reads) {
     const name = String(r.owner || '').trim();
     if (!name || !r.lu) continue;
     const note = r.note != null && r.note !== '' ? Number(r.note) : null;
     const read_date = r.read_date || null;
     insert.run(bookId, name, read_date, note);
-    if (name === primaryOwner) primaryRead = { note, read_date };
+    if (name === primaryOwner) primaryRead = { read_date };
+    if (note != null) notes.push(note);
   }
 
+  const avgNote = notes.length ? Math.round(notes.reduce((a, b) => a + b, 0) / notes.length) : null;
   return primaryRead
-    ? { lu: 1, note: primaryRead.note, read_date: primaryRead.read_date }
-    : { lu: 0, note: null, read_date: null };
+    ? { lu: 1, note: avgNote, read_date: primaryRead.read_date }
+    : { lu: 0, note: avgNote, read_date: null };
 }
 
 app.get('/api/books', (req, res) => {
