@@ -198,7 +198,7 @@ app.post('/api/login', (req, res) => {
     return res.status(429).json({ error: `Trop de tentatives, réessayez dans ${retryAfterSec}s` });
   }
 
-  const { username, password } = req.body || {};
+  const { username, password, remember } = req.body || {};
   const validUser = typeof username === 'string' && safeCompare(username, AUTH_USERNAME);
   const validPass = typeof password === 'string' && safeCompare(password, AUTH_PASSWORD);
   if (!validUser || !validPass) {
@@ -207,9 +207,14 @@ app.post('/api/login', (req, res) => {
   }
   loginThrottle.clearFailures(req.ip);
   const token = crypto.randomBytes(32).toString('hex');
+  // La session côté serveur dure toujours SESSION_DURATION_MS quel que soit
+  // "remember" — seul le cookie change : avec Max-Age il survit à la
+  // fermeture du navigateur, sans ("rester connecté" décoché) c'est un
+  // cookie de session que le navigateur efface à sa fermeture.
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
   db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)').run(token, expiresAt);
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION_MS / 1000}; Path=/`);
+  const maxAge = remember ? `; Max-Age=${SESSION_DURATION_MS / 1000}` : '';
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax${maxAge}; Path=/`);
   res.json({ ok: true });
 });
 

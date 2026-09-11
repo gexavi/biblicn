@@ -64,6 +64,32 @@
     background: var(--paper-raised);
   }
   .login-field input:focus { outline: 1px solid var(--brass); }
+  .password-wrap { position: relative; }
+  .password-wrap input { width: 100%; box-sizing: border-box; padding-right: 40px; }
+  .password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--ink-soft);
+    padding: 7px 8px;
+    cursor: pointer;
+  }
+  .password-toggle:hover { color: var(--ink); }
+  .login-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: -4px 0 16px;
+    cursor: pointer;
+  }
+  .login-remember input { width: 16px; height: 16px; cursor: pointer; }
   .login-error {
     min-height: 18px;
     font-size: 13px;
@@ -85,8 +111,15 @@
   </div>
   <div class="login-field">
     <label for="password">Mot de passe</label>
-    <input type="password" id="password" name="password" autocomplete="current-password" required>
+    <div class="password-wrap">
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="button" class="password-toggle" id="togglePassword" aria-label="Afficher le mot de passe" aria-pressed="false">👁</button>
+    </div>
   </div>
+  <label class="login-remember">
+    <input type="checkbox" id="remember" checked>
+    <span>Rester connecté</span>
+  </label>
   <div class="login-error" id="loginError"></div>
   <button type="submit" class="btn btn-primary login-submit" id="loginSubmit">Se connecter</button>
 </form>
@@ -95,6 +128,16 @@
 const form = document.getElementById('loginForm');
 const errorEl = document.getElementById('loginError');
 const submitBtn = document.getElementById('loginSubmit');
+const passwordInput = document.getElementById('password');
+const togglePasswordBtn = document.getElementById('togglePassword');
+
+togglePasswordBtn.addEventListener('click', () => {
+  const showing = passwordInput.type === 'text';
+  passwordInput.type = showing ? 'password' : 'text';
+  togglePasswordBtn.textContent = showing ? '👁' : '🙈';
+  togglePasswordBtn.setAttribute('aria-label', showing ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+  togglePasswordBtn.setAttribute('aria-pressed', String(!showing));
+});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -107,7 +150,8 @@ form.addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: document.getElementById('username').value,
-        password: document.getElementById('password').value,
+        password: passwordInput.value,
+        remember: document.getElementById('remember').checked,
       }),
     });
     if (res.ok) {
