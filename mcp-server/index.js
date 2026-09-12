@@ -1,11 +1,20 @@
-// Serveur MCP (lecture seule) pour "Ma Bibliothèque", exposé en SSE pour
-// l'intégration "Model Context Protocol" de Home Assistant
-// (http://<ip-nas>:MCP_PORT/sse). Processus séparé du serveur principal
-// (server.js) : même volume de données (DATA_DIR), lu uniquement (voir
-// db.js), jamais démarré/arrêté en même temps que l'appli web.
+// Serveur MCP (lecture seule) pour "Ma Bibliothèque", exposé aux agents de
+// conversation (Home Assistant Assist + Google Gemini, ou l'inspecteur MCP
+// pour tester). Processus séparé du serveur principal (server.js) : même
+// volume de données (DATA_DIR), lu uniquement (voir db.js), jamais démarré/
+// arrêté en même temps que l'appli web.
+//
+// Deux transports exposés côte à côte, sur le modèle officiel du SDK
+// (backwards-compatible server) : Home Assistant (testé en conditions
+// réelles) utilise le Streamable HTTP moderne sur /mcp ; /sse + /messages
+// restent disponibles pour d'anciens clients (dont l'inspecteur MCP, qui
+// supporte les deux).
+import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { registerTools } from './tools.js';
 
 const PORT = Number(process.env.MCP_PORT) || 3100;
@@ -38,11 +47,61 @@ function checkSharedSecret(req, res) {
   return false;
 }
 
-// Un transport SSE par connexion cliente, indexé par sessionId (généré par
-// le SDK) — nécessaire pour router les POST /messages suivants vers la
-// bonne connexion SSE ouverte sur /sse.
+// Un transport par session cliente (Streamable HTTP ou SSE), indexé par
+// l'identifiant de session — nécessaire pour router les requêtes suivantes
+// vers la bonne connexion.
 const transports = {};
 
+//=============================================================================
+// STREAMABLE HTTP (protocole moderne) — /mcp, utilisé par Home Assistant.
+//=============================================================================
+app.all('/mcp', async (req, res) => {
+  if (!checkSharedSecret(req, res)) return;
+  try {
+    const sessionId = req.headers['mcp-session-id'];
+    let transport;
+
+    if (sessionId && transports[sessionId]) {
+      const existing = transports[sessionId];
+      if (!(existing instanceof StreamableHTTPServerTransport)) {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: { code: -32000, message: 'Cette session utilise un autre transport' },
+          id: null
+        });
+        return;
+      }
+      transport = existing;
+    } else if (!sessionId && req.method === 'POST' && isInitializeRequest(req.body)) {
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => { transports[id] = transport; }
+      });
+      transport.onclose = () => {
+        if (transport.sessionId) delete transports[transport.sessionId];
+      };
+      await getServer().connect(transport);
+    } else {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Identifiant de session manquant ou invalide' },
+        id: null
+      });
+      return;
+    }
+
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error('Erreur en traitant la requête MCP (/mcp) :', err);
+    if (!res.headersSent) {
+      res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Erreur interne' }, id: null });
+    }
+  }
+});
+
+//=============================================================================
+// HTTP+SSE (protocole historique) — /sse + /messages, pour d'anciens clients.
+//=============================================================================
 app.get('/sse', async (req, res) => {
   if (!checkSharedSecret(req, res)) return;
   try {
@@ -60,7 +119,7 @@ app.post('/messages', async (req, res) => {
   if (!checkSharedSecret(req, res)) return;
   const sessionId = req.query.sessionId;
   const transport = sessionId && transports[sessionId];
-  if (!transport) {
+  if (!transport || !(transport instanceof SSEServerTransport)) {
     res.status(404).send('Session MCP inconnue (le flux SSE a peut-être expiré, relancez la connexion)');
     return;
   }
@@ -75,7 +134,7 @@ app.post('/messages', async (req, res) => {
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Serveur MCP "Ma Bibliothèque" (lecture seule) sur le port ${PORT} — flux SSE sur /sse`);
+  console.log(`Serveur MCP "Ma Bibliothèque" (lecture seule) sur le port ${PORT} — Streamable HTTP sur /mcp, SSE historique sur /sse`);
 });
 
 process.on('SIGINT', async () => {

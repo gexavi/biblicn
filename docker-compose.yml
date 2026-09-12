@@ -24,7 +24,7 @@ services:
       - /volume1/docker/bibliotheque/data:/app/data
 
   # Serveur MCP en lecture seule pour un agent de conversation (ex. Home
-  # Assistant Assist + intégration Anthropic Conversation) — voir mcp-server/.
+  # Assistant Assist + intégration Google Gemini) — voir mcp-server/.
   # Optionnel : à retirer si vous ne vous en servez pas.
   bibliotheque-mcp:
     build:

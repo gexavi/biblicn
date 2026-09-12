@@ -1,6 +1,6 @@
 # Serveur MCP — Ma Bibliothèque
 
-Petit service **en lecture seule**, séparé de l'application principale, qui expose la bibliothèque à un agent de conversation (Home Assistant Assist + intégration Anthropic Conversation) via le protocole [MCP](https://modelcontextprotocol.io) en transport SSE.
+Petit service **en lecture seule**, séparé de l'application principale, qui expose la bibliothèque à un agent de conversation (Home Assistant Assist + intégration Google Gemini) via le protocole [MCP](https://modelcontextprotocol.io). Les deux transports sont exposés côte à côte : Streamable HTTP (`/mcp`, ce qu'utilise réellement l'intégration MCP de Home Assistant) et l'ancien HTTP+SSE (`/sse` + `/messages`, pour d'anciens clients comme certaines versions de l'inspecteur MCP).
 
 Il ouvre directement le même fichier `bibliotheque.db` que le serveur principal (lecture seule, jamais d'écriture), donc aucune API réseau supplémentaire n'est nécessaire côté appli principale.
 
@@ -22,7 +22,7 @@ npm install
 DATA_DIR=../data npm start
 ```
 
-Le serveur écoute sur `http://localhost:3100` (`MCP_PORT` pour changer), avec le flux SSE sur `/sse`.
+Le serveur écoute sur `http://localhost:3100` (`MCP_PORT` pour changer) : endpoint Streamable HTTP sur `/mcp`, flux SSE historique sur `/sse` + `/messages`.
 
 ## Déployer sur le NAS
 
@@ -34,9 +34,9 @@ Variable optionnelle : `MCP_SHARED_SECRET` (voir `.env.example`) — si définie
 
 ## Brancher sur Home Assistant
 
-1. **Intégration "Model Context Protocol"** — Paramètres → Appareils et services → Ajouter une intégration → `Model Context Protocol` → URL : `http://<ip-nas>:3100/sse` (ajoutez l'en-tête `Authorization: Bearer <secret>` dans la configuration avancée si `MCP_SHARED_SECRET` est défini).
-2. **Intégration "Anthropic Conversation"** — Paramètres → Appareils et services → Ajouter → clé API Anthropic.
-3. Dans la configuration de l'agent de conversation Anthropic, activez l'option "LLM API"/contrôle et sélectionnez l'intégration MCP créée à l'étape 1.
+1. **Intégration "Model Context Protocol"** — Paramètres → Appareils et services → Ajouter une intégration → `Model Context Protocol` → URL : `http://<ip-nas>:3100/mcp` (et non `/sse` — l'intégration MCP de Home Assistant utilise le transport Streamable HTTP moderne ; ajoutez l'en-tête `Authorization: Bearer <secret>` dans la configuration avancée si `MCP_SHARED_SECRET` est défini).
+2. **Intégration "Google Gemini"** — Paramètres → Appareils et services → Ajouter → `Google Gemini` → clé API gratuite générée sur [aistudio.google.com](https://aistudio.google.com) (palier gratuit Flash/Flash-Lite, pas de carte bancaire).
+3. Dans la configuration de l'agent de conversation Gemini, activez l'option "LLM API"/contrôle et sélectionnez l'intégration MCP créée à l'étape 1.
 4. Définissez cet agent comme agent de conversation par défaut d'Assist (Paramètres → Assistants vocaux).
 5. Testez d'abord en texte dans l'onglet **Assist** de Home Assistant (ex. "Est-ce que je possède des livres de Harlan Coben ?") avant de passer au vocal.
 
