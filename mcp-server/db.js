@@ -38,8 +38,8 @@ export function searchBooks({ query, author, genre, type, owner, status, lu, lim
   params.push(normalizeStatus(status));
 
   if (query) {
-    sql += ' AND (title LIKE ? OR author LIKE ? OR series LIKE ?)';
-    params.push(`%${query}%`, `%${query}%`, `%${query}%`);
+    sql += ' AND (title LIKE ? OR author LIKE ? OR series LIKE ? OR publisher LIKE ?)';
+    params.push(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`);
   }
   if (author) {
     sql += ' AND author LIKE ?';

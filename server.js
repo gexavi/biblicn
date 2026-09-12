@@ -604,8 +604,8 @@ app.get('/api/books', (req, res) => {
   params.push(normalizeStatus(status));
 
   if (q) {
-    query += ' AND (title LIKE ? OR author LIKE ? OR isbn LIKE ? OR series LIKE ?)';
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    query += ' AND (title LIKE ? OR author LIKE ? OR isbn LIKE ? OR series LIKE ? OR publisher LIKE ?)';
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   if (type) {
     query += ' AND type = ?';

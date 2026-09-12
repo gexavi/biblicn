@@ -30,9 +30,9 @@ export function registerTools(server) {
     'search_books',
     {
       title: 'Rechercher des livres',
-      description: "Recherche des livres dans la bibliothèque par titre/auteur/série, genre, type, propriétaire ou statut de lecture. Par défaut, ne cherche que parmi les livres possédés (pas la liste de souhaits ni les livres revendus).",
+      description: "Recherche des livres dans la bibliothèque par titre/auteur/série/éditeur, genre, type, propriétaire ou statut de lecture. Par défaut, ne cherche que parmi les livres possédés (pas la liste de souhaits ni les livres revendus).",
       inputSchema: {
-        query: z.string().optional().describe('Texte à chercher dans le titre, l\'auteur ou la série'),
+        query: z.string().optional().describe('Texte à chercher dans le titre, l\'auteur, la série ou l\'éditeur'),
         author: z.string().optional().describe('Filtrer par auteur (correspondance partielle)'),
         genre: z.string().optional().describe('Filtrer par genre, ex. "Fantasy" ou "policier"'),
         type: z.enum(['roman', 'bd', 'manga', 'essai', 'autre']).optional().describe('Filtrer par type de livre'),
@@ -89,9 +89,9 @@ export function registerTools(server) {
     'list_wishlist',
     {
       title: 'Liste de souhaits',
-      description: 'Liste les livres de la liste de souhaits (pas encore achetés), avec filtres optionnels par titre/auteur ou genre.',
+      description: 'Liste les livres de la liste de souhaits (pas encore achetés), avec filtres optionnels par titre/auteur/série/éditeur ou genre.',
       inputSchema: {
-        query: z.string().optional().describe('Texte à chercher dans le titre, l\'auteur ou la série'),
+        query: z.string().optional().describe('Texte à chercher dans le titre, l\'auteur, la série ou l\'éditeur'),
         genre: z.string().optional().describe('Filtrer par genre'),
         limit: z.number().int().min(1).max(50).optional().describe('Nombre maximum de résultats (20 par défaut)')
       }
