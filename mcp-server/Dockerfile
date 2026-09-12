@@ -1,6 +1,6 @@
 # Construire depuis la RACINE du dépôt (le contexte doit inclure lib/) :
 #   docker build -f mcp-server/Dockerfile -t bibliotheque-mcp .
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
