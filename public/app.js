@@ -502,9 +502,15 @@ function formatDateFr(isoDate) {
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  // Cette valeur est aussi bien injectée dans du contenu texte que dans des
+  // attributs entre guillemets (src=, data-owner=, value=...) : il faut donc
+  // échapper aussi les guillemets, pas seulement &/</>.
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function updateModalCoverPreview() {

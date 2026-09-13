@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const dns = require('dns').promises;
+const net = require('net');
 const Database = require('better-sqlite3');
 const fetch = require('node-fetch');
 const sharp = require('sharp');
@@ -502,8 +504,51 @@ async function lookupIsbn(isbn) {
 const COVER_MAX_WIDTH = Number(process.env.COVER_MAX_WIDTH) || 500;
 const COVER_JPEG_QUALITY = Number(process.env.COVER_JPEG_QUALITY) || 82;
 
+// Anti-SSRF : cover_url est une URL librement saisie par le client (collée
+// manuellement ou renvoyée par une source ISBN externe), qu'on va chercher
+// nous-mêmes côté serveur. Sans ce filtre, un compte compromis pourrait s'en
+// servir pour sonder des services internes (NAS, réseau Docker, métadonnées
+// cloud) qui ne sont normalement pas accessibles depuis l'extérieur.
+function isPrivateOrLocalIp(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    return (
+      a === 127 || a === 10 || a === 0 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+  if (net.isIPv6(ip)) {
+    const norm = ip.toLowerCase();
+    return norm === '::1' || norm.startsWith('fe80:') || norm.startsWith('fc') || norm.startsWith('fd')
+      || norm.startsWith('::ffff:127.') || norm.startsWith('::ffff:10.') || norm.startsWith('::ffff:192.168.');
+  }
+  return true; // forme non reconnue : on refuse par prudence
+}
+
+async function isSafeRemoteUrl(remoteUrl) {
+  let parsed;
+  try {
+    parsed = new URL(remoteUrl);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  try {
+    const addresses = await dns.lookup(parsed.hostname, { all: true });
+    return addresses.every(({ address }) => !isPrivateOrLocalIp(address));
+  } catch {
+    return false; // hôte introuvable : rien à télécharger de toute façon
+  }
+}
+
 async function localizeCover(bookId, remoteUrl) {
   if (!remoteUrl || remoteUrl.startsWith('/covers/')) return remoteUrl || null;
+  if (!(await isSafeRemoteUrl(remoteUrl))) {
+    console.error(`Couverture ignorée (URL non autorisée) : ${remoteUrl}`);
+    return null;
+  }
   try {
     const res = await fetch(remoteUrl, { timeout: 12000 });
     if (!res.ok) return null;
