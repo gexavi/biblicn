@@ -2,10 +2,16 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-# Dépendances système nécessaires pour compiler better-sqlite3
-RUN apk add --no-cache python3 make g++
+# Applique les derniers correctifs de sécurité Alpine (libssl3, libcrypto3,
+# libexpat, tar...) au moment du build plutôt que de dépendre de la date de
+# publication de l'image de base node:24-alpine.
+RUN apk upgrade --no-cache
 
 COPY package.json ./
+# Pas de chaîne de compilation (python3/make/g++) : better-sqlite3 et sharp
+# embarquent tous les deux des binaires précompilés pour musl (Alpine), donc
+# rien à compiler ici — ça évite aussi de tirer node-gyp et ses dépendances
+# transitives (glob, cross-spawn, brace-expansion...) dans l'image finale.
 RUN npm install --omit=dev
 
 COPY server.js ./
