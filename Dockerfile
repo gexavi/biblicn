@@ -12,7 +12,14 @@ COPY package.json ./
 # embarquent tous les deux des binaires précompilés pour musl (Alpine), donc
 # rien à compiler ici — ça évite aussi de tirer node-gyp et ses dépendances
 # transitives (glob, cross-spawn, brace-expansion...) dans l'image finale.
-RUN npm install --omit=dev
+# npm (et npx/corepack) ne servent plus une fois `npm install` terminé —
+# seul `node server.js` tourne au final. On les retire de l'image : le CLI
+# npm embarque lui-même tar/undici/ip-address/brace-expansion, dont les
+# versions suivent le rythme de publication de l'image de base node:24-alpine
+# et remontent régulièrement comme vulnérables dans les scans, alors qu'ils
+# ne sont jamais exécutés en prod.
+RUN npm install --omit=dev \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/corepack.cjs
 
 COPY server.js ./
 COPY lib ./lib

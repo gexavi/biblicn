@@ -9,8 +9,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
-    "better-sqlite3": "^11.3.0",
+    "better-sqlite3": "^13.0.3",
     "express": "^4.19.2",
     "zod": "^4.6.2"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

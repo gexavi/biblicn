@@ -4,11 +4,18 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-# Dépendances système nécessaires pour compiler better-sqlite3
-RUN apk add --no-cache python3 make g++
+# Applique les derniers correctifs de sécurité Alpine au moment du build
+# plutôt que de dépendre de la date de publication de l'image de base.
+RUN apk upgrade --no-cache
 
 COPY mcp-server/package.json ./mcp-server/package.json
-RUN cd mcp-server && npm install --omit=dev
+# Pas de chaîne de compilation (python3/make/g++) : better-sqlite3 embarque
+# des binaires précompilés pour musl (Alpine), rien à compiler ici. npm/npx/
+# corepack ne servent plus une fois l'install terminée ; les retirer évite de
+# traîner leurs propres dépendances (tar, undici, ip-address,
+# brace-expansion...) jamais exécutées en prod.
+RUN cd mcp-server && npm install --omit=dev \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/corepack.cjs
 
 COPY lib ./lib
 COPY mcp-server ./mcp-server
