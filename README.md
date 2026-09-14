@@ -1,167 +1,169 @@
-# Ma Bibliothèque
+# Ma Bibliothèque (*My Library*)
 
-Application auto-hébergée de gestion de bibliothèque personnelle : recherche de livres par ISBN, fiches avec titre, auteur, éditeur, type (roman/BD/manga/essai/autre), genre, série (avec numéro de tome), lecture (avec date), note sur 20, emplacement de rangement, prêt et propriétaire. Interface web responsive, utilisable sur mobile ou navigateur.
+🇫🇷 [Version française](README-fr.md)
 
-## Fonctionnement
+Self-hosted personal library management app: search books by ISBN, records with title, author, publisher, type (novel/comic/manga/essay/other), genre, series (with volume number), read status (with date), rating out of 20, storage location, loan tracking, and owner. Responsive web interface, usable on mobile or desktop browsers.
 
-- **Backend** : Node.js + Express, expose une API REST et sert le front-end.
-- **Base de données** : SQLite (un simple fichier, aucun serveur de BDD à gérer), stockée dans le dossier `data/` monté en volume Docker — vos livres survivent aux mises à jour et redémarrages du conteneur.
-- **Recherche ISBN** : interroge l'API publique et gratuite [Open Library](https://openlibrary.org/), avec [Google Books](https://developers.google.com/books) en secours si le livre n'y est pas référencé. Ces deux services nécessitent un accès Internet sortant depuis le NAS.
-- **Front-end** : HTML/CSS/JS natifs, aucune dépendance de build, responsive du mobile au bureau.
-- **Traitement d'image** : la bibliothèque `sharp` (redimensionnement/compression des couvertures) télécharge un binaire précompilé adapté au processeur du NAS au moment du build Docker (`npm install` se fait directement sur le NAS, pas besoin de compilation croisée). Ça fonctionne normalement aussi bien sur les NAS Intel/AMD (x64) que sur les modèles ARM. Si jamais le build échoue spécifiquement sur l'installation de `sharp` (rare, en général sur un très vieux modèle ARM32), voir la section [Dépannage](#dépannage-sharp-si-le-build-échoue) plus bas.
+## How it works
 
-## Déploiement sur un NAS Synology
+- **Backend**: Node.js + Express, exposes a REST API and serves the frontend.
+- **Database**: SQLite (a single file, no database server to manage), stored in the `data/` folder mounted as a Docker volume — your books survive container updates and restarts.
+- **ISBN search**: queries the free, public [Open Library](https://openlibrary.org/) API, falling back to [Google Books](https://developers.google.com/books) if the book isn't referenced there. Both services require outbound internet access from the NAS.
+- **Frontend**: plain HTML/CSS/JS, no build step, responsive from mobile to desktop.
+- **Image processing**: the `sharp` library (cover resizing/compression) downloads a precompiled binary matching the NAS's processor at Docker build time (`npm install` runs directly on the NAS, no cross-compilation needed). This works out of the box on both Intel/AMD (x64) and ARM Synology models. If the build fails specifically on installing `sharp` (rare, generally only on a very old 32-bit ARM model), see the [Troubleshooting](#troubleshooting-sharp-if-the-build-fails) section below.
 
-### Option A — via Container Manager (interface graphique)
+## Deploying on a Synology NAS
 
-1. Copiez tout le dossier `bibliotheque-app` sur votre NAS, par exemple dans `/volume1/docker/bibliotheque-app/`. Vous pouvez le faire via **File Station** (glisser-déposer le zip puis l'extraire) ou en réseau (SMB).
-2. Ouvrez **Container Manager** (anciennement Docker) sur le DSM.
-3. Allez dans **Projet** → **Créer**.
-4. Nom du projet : `bibliotheque`. Chemin : sélectionnez le dossier `bibliotheque-app` copié à l'étape 1.
-5. Container Manager détecte automatiquement le fichier `docker-compose.yml`. Avant de lancer, éditez-le (bouton "Éditer le fichier YAML" dans l'assistant, ou directement dans File Station) pour remplacer la ligne de volume par un chemin explicite de votre NAS :
+### Option A — via Container Manager (graphical interface)
+
+1. Copy the whole `bibliotheque-app` folder to your NAS, e.g. into `/volume1/docker/bibliotheque-app/`. You can do this via **File Station** (drag and drop the zip, then extract it) or over the network (SMB).
+2. Open **Container Manager** (formerly Docker) in DSM.
+3. Go to **Project** → **Create**.
+4. Project name: `bibliotheque`. Path: select the `bibliotheque-app` folder copied in step 1.
+5. Container Manager automatically detects the `docker-compose.yml` file. Before launching, edit it (the "Edit YAML file" button in the wizard, or directly in File Station) to replace the volume line with an explicit path on your NAS:
    ```yaml
    volumes:
      - /volume1/docker/bibliotheque-app/data:/app/data
    ```
-6. Cliquez sur **Suivant** puis **Terminé**. La construction de l'image prend une à deux minutes la première fois.
-7. Une fois le conteneur démarré, l'application est accessible sur `http://IP_DE_VOTRE_NAS:7000`.
+6. Click **Next** then **Done**. Building the image takes one to two minutes the first time.
+7. Once the container has started, the app is accessible at `http://YOUR_NAS_IP:7000`.
 
-### Option B — en ligne de commande (SSH)
+### Option B — command line (SSH)
 
 ```bash
-# Connectez-vous en SSH au NAS, puis :
+# SSH into the NAS, then:
 cd /volume1/docker
 mkdir -p bibliotheque-app && cd bibliotheque-app
-# copiez-y les fichiers du projet (scp, git, ou File Station), puis :
+# copy the project files here (scp, git, or File Station), then:
 sudo docker compose up -d --build
 ```
 
-### Accès mobile et web
+### Mobile and web access
 
-L'application est une simple page web responsive : ouvrez `http://IP_DE_VOTRE_NAS:7000` depuis le navigateur de votre téléphone (connecté au même réseau, ou via votre VPN/reverse proxy Synology si vous voulez y accéder depuis l'extérieur).
+The app is a simple responsive web page: open `http://YOUR_NAS_IP:7000` from your phone's browser (on the same network, or via your Synology VPN/reverse proxy for access from outside).
 
-Pour un accès distant sécurisé, le plus simple est de passer par le **Reverse Proxy** intégré au DSM (Panneau de configuration → Portail des applications → Reverse Proxy) en pointant un sous-domaine vers `localhost:3000`, combiné à Quick Connect ou un certificat Let's Encrypt déjà configuré sur votre NAS.
+For secure remote access, the easiest way is to go through DSM's built-in **Reverse Proxy** (Control Panel → Login Portal → Reverse Proxy) pointing a subdomain to `localhost:3000`, combined with QuickConnect or a Let's Encrypt certificate already configured on your NAS.
 
-### Installation en application (PWA)
+### Installing as an app (PWA)
 
-L'application est installable comme une vraie app, avec sa propre icône et sans barre d'adresse de navigateur. Une fois connecté depuis un navigateur mobile, utilisez le menu du navigateur → **Ajouter à l'écran d'accueil** (Android/Chrome) ou **Partager → Sur l'écran d'accueil** (iPhone/Safari).
+The app can be installed like a real app, with its own icon and no browser address bar. Once logged in from a mobile browser, use the browser menu → **Add to Home Screen** (Android/Chrome) or **Share → Add to Home Screen** (iPhone/Safari).
 
-**Nécessite HTTPS**, comme le scanner de code-barres (voir la section dédiée plus bas) — les navigateurs n'autorisent l'installation d'une PWA que sur une connexion sécurisée. Sans HTTPS, l'application reste utilisable normalement, seule l'option d'installation n'apparaît pas.
+**Requires HTTPS**, like the barcode scanner (see the dedicated section below) — browsers only allow installing a PWA over a secure connection. Without HTTPS, the rest of the app works normally; only the install option won't appear.
 
-## Connexion
+## Login
 
-L'application est protégée par un identifiant et un mot de passe uniques, partagés par tout le foyer (pas de comptes individuels). Le `docker-compose.yml` lit ces valeurs depuis les variables `AUTH_USERNAME`/`AUTH_PASSWORD` sans valeur par défaut : l'application (et même le déploiement de la stack) refuse de démarrer tant qu'elles ne sont pas définies, pour éviter de tourner avec un mot de passe oublié à sa valeur par défaut.
+The app is protected by a single username and password, shared by the whole household (no individual accounts). `docker-compose.yml` reads these values from the `AUTH_USERNAME`/`AUTH_PASSWORD` variables with no default: the app (and even the stack deployment itself) refuses to start until they're set, to avoid ever running with a forgotten default password.
 
-**Avec Portainer** : ouvrez la stack → onglet **Environment variables** → ajoutez `AUTH_USERNAME` et `AUTH_PASSWORD` avec vos valeurs, puis redéployez. Ne les modifiez pas directement dans le fichier `docker-compose.yml` affiché — Portainer les injecte séparément au moment du déploiement.
+**With Portainer**: open the stack → **Environment variables** tab → add `AUTH_USERNAME` and `AUTH_PASSWORD` with your values, then redeploy. Don't edit them directly in the displayed `docker-compose.yml` file — Portainer injects them separately at deploy time.
 
-**En ligne de commande (`docker compose`)** : créez un fichier `.env` à côté de `docker-compose.yml` :
+**Command line (`docker compose`)**: create a `.env` file next to `docker-compose.yml`:
 ```
 AUTH_USERNAME=admin
-AUTH_PASSWORD=votre_mot_de_passe
+AUTH_PASSWORD=your_password
 ```
 
-Une fois connecté depuis un navigateur, la session reste active 30 jours (même après un redémarrage du conteneur) ; un bouton **⏻ Déconnexion** en haut à droite permet de fermer la session manuellement.
+Once logged in from a browser, the session stays active for 30 days (even after a container restart); a **⏻ Logout** button in the top right lets you end the session manually.
 
-**Protection anti-bruteforce** : après 5 tentatives de connexion échouées, l'adresse IP à l'origine des tentatives est bloquée 5 minutes avant de pouvoir réessayer. Si vous accédez à l'application via le **Reverse Proxy** du DSM (voir plus haut), toutes les requêtes arrivent à l'application avec l'adresse IP interne du reverse proxy plutôt que celle du visiteur : le blocage s'applique alors à tous les utilisateurs passant par ce proxy en cas d'échecs répétés, plutôt qu'à un seul visiteur malveillant. Sans incidence pour un usage familial normal (peu de monde se trompe 5 fois de suite), mais à garder en tête.
+**Anti-bruteforce protection**: after 5 failed login attempts, the IP address behind them is locked out for 5 minutes before it can try again. If you access the app through DSM's **Reverse Proxy** (see above), all requests reach the app with the reverse proxy's internal IP address rather than the visitor's: the lockout then applies to everyone going through that proxy after repeated failures, rather than to a single malicious visitor. No impact for normal household use (few people mistype a password 5 times in a row), but worth keeping in mind.
 
-## Réglages avancés (optionnels)
+## Advanced settings (optional)
 
-En plus de `AUTH_USERNAME`/`AUTH_PASSWORD`, quelques variables d'environnement optionnelles (valeur par défaut appliquée si absentes) permettent d'ajuster le comportement de l'application sans toucher au code. Voir le fichier `.env.example` pour la liste complète avec description :
+Besides `AUTH_USERNAME`/`AUTH_PASSWORD`, a few optional environment variables (with a default value applied when absent) let you adjust the app's behavior without touching the code. See the `.env.example` file for the full list with descriptions:
 
-| Variable | Défaut | Effet |
+| Variable | Default | Effect |
 |---|---|---|
-| `SESSION_DURATION_DAYS` | `30` | Durée de validité d'une session avant reconnexion |
-| `COVER_MAX_WIDTH` | `500` | Largeur max (px) des couvertures mises en cache |
-| `COVER_JPEG_QUALITY` | `82` | Qualité de compression JPEG des couvertures |
-| `BACKUP_INTERVAL_DAYS` | `15` | Fréquence de la sauvegarde automatique |
-| `BACKUP_KEEP` | `6` | Nombre de sauvegardes automatiques conservées |
-| `COOKIE_SECURE` | `false` | `auto` active l'attribut Secure du cookie de session dès qu'un Reverse Proxy HTTPS est détecté (`X-Forwarded-Proto`) ; `true` le force toujours |
+| `SESSION_DURATION_DAYS` | `30` | How long a session stays valid before requiring login again |
+| `COVER_MAX_WIDTH` | `500` | Max width (px) of cached covers |
+| `COVER_JPEG_QUALITY` | `82` | JPEG compression quality of covers |
+| `BACKUP_INTERVAL_DAYS` | `15` | How often the automatic backup runs |
+| `BACKUP_KEEP` | `6` | Number of automatic backups kept |
+| `COOKIE_SECURE` | `false` | `auto` enables the session cookie's Secure attribute as soon as an HTTPS Reverse Proxy is detected (`X-Forwarded-Proto`); `true` always forces it |
 
-Ajoutez-les au fichier `.env` (ligne de commande) ou aux **Environment variables** de la stack (Portainer), comme pour `AUTH_USERNAME`/`AUTH_PASSWORD`.
+Add them to the `.env` file (command line) or to the stack's **Environment variables** (Portainer), just like `AUTH_USERNAME`/`AUTH_PASSWORD`.
 
-## Changer le port
+## Changing the port
 
-L'application est configurée pour être accessible sur le port **7000**. Si besoin, modifiez `docker-compose.yml` :
+The app is configured to be accessible on port **7000**. If needed, edit `docker-compose.yml`:
 ```yaml
 ports:
-  - "8090:3000"   # accès via http://IP_DU_NAS:8090
+  - "8090:3000"   # access via http://NAS_IP:8090
 ```
 
-## Sauvegarde
+## Backup
 
-Toutes les données sont dans le dossier `data/` (fichier `bibliotheque.db`). Il suffit de sauvegarder ce dossier (Hyper Backup, snapshot du volume partagé, etc.) pour sauvegarder toute la bibliothèque.
+All data lives in the `data/` folder (the `bibliotheque.db` file). Simply back up this folder (Hyper Backup, shared volume snapshot, etc.) to back up the whole library.
 
-**Sauvegarde automatique intégrée** : en plus de la sauvegarde NAS ci-dessus, l'application copie elle-même la base et les couvertures dans `data/backup/AAAA-MM-JJ/` tous les 15 jours (au démarrage si la dernière sauvegarde a plus de 15 jours, puis à intervalle régulier tant que le conteneur tourne). Les 6 dernières sont conservées (~3 mois d'historique), les plus anciennes sont supprimées automatiquement. La base est sauvegardée à chaud via l'API de backup de SQLite (pas une simple copie de fichier), donc sans risque de corruption même si l'application est utilisée au moment de la sauvegarde.
+**Built-in automatic backup**: in addition to the NAS backup above, the app itself copies the database and covers into `data/backup/YYYY-MM-DD/` every 15 days (on startup if the last backup is older than 15 days, then at regular intervals as long as the container runs). The last 6 are kept (~3 months of history), older ones are automatically deleted. The database is backed up live via SQLite's backup API (not a plain file copy), so there's no risk of corruption even if the app is being used at the moment of the backup.
 
-## Développement / test en local (sans Docker)
+## Local development / testing (without Docker)
 
 ```bash
 npm install
 npm start
-# puis ouvrez http://localhost:3000
+# then open http://localhost:3000
 ```
 
-**Tests** : la logique pure sans effet de bord (conversion ISBN-10/13, fusion des sources de recherche, anti-bruteforce sur la connexion, etc.) est extraite dans `lib/` et testée isolément ; les routes de `server.js` (CRUD des livres, import en masse, statistiques) sont couvertes par des tests d'intégration qui démarrent l'app sur un port libre et une base de données temporaire — le tout avec le testeur intégré à Node.js, sans dépendance supplémentaire :
+**Tests**: pure logic with no side effects (ISBN-10/13 conversion, merging search sources, login anti-bruteforce, etc.) is extracted into `lib/` and tested in isolation; `server.js` routes (book CRUD, bulk import, statistics) are covered by integration tests that start the app on a free port with a temporary database — all using Node.js's built-in test runner, no extra dependency:
 ```bash
 npm test
 ```
 
-## Import en masse
+## Bulk import
 
-Le bouton **Import en masse** (en haut de l'écran) propose deux méthodes :
+The **Bulk import** button (at the top of the screen) offers two methods:
 
-- **Liste d'ISBN** : collez un ISBN par ligne (avec ou sans tirets). Chaque livre est recherché automatiquement comme pour l'ajout unitaire, avec un type, un rangement et un propriétaire par défaut appliqués à tous. Les ISBN introuvables sont listés à part, sans bloquer les autres.
-- **Fichier CSV** : importez un fichier avec les colonnes `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn, series, series_number` (première ligne = en-têtes, seule `title` est obligatoire ; `type` = `roman`, `bd`, `manga`, `essai` ou `autre` ; `lu` = `oui`/`non`). Le séparateur (virgule ou point-virgule) est détecté automatiquement — utile pour les exports Excel en français, qui utilisent le point-virgule par défaut. Un bouton **Télécharger un modèle CSV** dans la modale fournit un exemple prêt à remplir dans un tableur. Pratique pour ressaisir un catalogue existant (export Excel, Babelio, Goodreads reformaté, etc.) sans dépendre de la recherche par ISBN.
+- **ISBN list**: paste one ISBN per line (with or without dashes). Each book is looked up automatically just like a single addition, with a default type, storage location, and owner applied to all of them. ISBNs that can't be found are listed separately, without blocking the others.
+- **CSV file**: import a file with the columns `title, author, type, genre, publisher, lu, note, location, lent_to, owner, isbn, series, series_number` (first line = headers, only `title` is required; `type` = `roman`, `bd`, `manga`, `essai`, or `autre`; `lu` = `oui`/`non`). The separator (comma or semicolon) is detected automatically — useful for French Excel exports, which use semicolons by default. A **Download a CSV template** button in the modal provides a ready-to-fill example for a spreadsheet. Handy for re-entering an existing catalog (Excel export, Babelio, reformatted Goodreads, etc.) without relying on ISBN search.
 
 ## Interface
 
-- **Couvertures mises en cache localement** : dès qu'un livre est ajouté ou modifié avec une couverture (recherche ISBN automatique, ou URL collée manuellement), l'application télécharge l'image une seule fois, la redimensionne à une largeur maximale de 500px et la compresse en JPEG (qualité 82%), puis la stocke dans `data/covers/` sur le NAS. Elle est ensuite servie localement (`/covers/{id}.jpg`) sans plus jamais dépendre des sites externes (Open Library, Amazon, etc.) au quotidien — plus rapide à charger, et à l'abri si une des sources disparaît un jour. Si le téléchargement échoue au moment de l'enregistrement, l'URL externe d'origine est conservée telle quelle en repli.
-  - **Optimiser les couvertures existantes** : le bouton 🖼️ en haut de l'écran repasse sur tous les livres déjà en base dont la couverture pointe encore vers une source externe (livres ajoutés avant cette fonctionnalité, ou dont la mise en cache avait échoué au moment de l'ajout) et les met en cache local. Sans effet sur les livres déjà optimisés — on peut le relancer autant de fois que nécessaire sans risque.
-  - **Attention aux grosses bibliothèques** : cette opération traite les livres un par un (téléchargement + redimensionnement), ce qui peut prendre plusieurs minutes pour une bibliothèque de plusieurs centaines de livres et dépasser le délai d'attente d'un navigateur ou d'un reverse proxy. Sans danger si ça arrive : les couvertures déjà traitées restent en cache, il suffit de recliquer sur le bouton pour reprendre là où ça s'est arrêté (les livres déjà optimisés sont automatiquement ignorés).
-  - Si aucune source automatique ne trouve de couverture (fréquent pour les BD, la BnF ne fournissant pas d'images), le champ « URL de couverture » dans la fiche du livre permet d'en coller une manuellement (depuis le site de l'éditeur, un revendeur, etc.) — elle sera mise en cache local de la même façon.
-- **Vue grille / liste** : deux boutons en haut à droite de la barre d'outils permettent de basculer entre l'affichage en grille (par défaut) et une vue en liste plus compacte. Le choix est mémorisé dans le navigateur.
-- **Bandeau figé au défilement** : sur ordinateur (écrans de plus de 640px de large), le bandeau du haut et la barre d'outils restent visibles en permanence pendant qu'on fait défiler les livres, pour garder la recherche/les filtres à portée de main. Sur mobile, ce comportement est désactivé pour ne pas grignoter l'espace vertical déjà limité.
-- **Thème sombre** : l'application est en thème sombre par défaut, avec un bandeau bleu nuit sous le titre « Ma Bibliothèque ».
-- **Date de lecture** : en cochant « Lu » dans la fiche d'un livre, un champ date apparaît (pré-rempli avec la date du jour, modifiable). Elle s'affiche ensuite sur la carte, à côté de la coche.
-- **Filtre par genre** : un menu déroulant dans la barre d'outils liste tous les genres utilisés dans la bibliothèque (les genres multiples séparés par des virgules sur une même fiche sont bien pris en compte séparément) et filtre l'affichage en conséquence.
-- **Filtre par note** : un menu déroulant (« 18/20 et plus », « 16/20 et plus », etc.) affiche uniquement les livres notés au moins à ce niveau. Les livres sans note (non lus, ou lus mais pas encore notés) sont exclus dès qu'un seuil est sélectionné.
-- **Statistiques par propriétaire** : le bouton 📊 Statistiques ouvre une vue avec une carte par personne (celles renseignées dans le champ « Appartient à »), affichant le nombre de livres possédés, la répartition par genre, et les lectures par année. Un livre partagé entre plusieurs personnes (ex. « Papa, Fils ») compte pour chacune d'elles séparément. Les livres sans propriétaire renseigné sont regroupés sous « Sans propriétaire » plutôt que d'être ignorés. Un livre revendu (voir plus bas) sort du total et de la répartition par genre, mais continue de compter dans les lectures par année : l'avoir lu reste vrai même après l'avoir revendu.
-- **Liste de souhaits** : le bouton 🎁 en haut de l'écran bascule vers une vue séparée des livres que vous souhaitez acquérir (recherche ISBN, couverture, genres... tout fonctionne pareil que pour la bibliothèque). Les vues ne se mélangent jamais : les statistiques, les filtres et le compte de livres ne portent que sur les livres réellement possédés, avec un compteur « souhaités » à part.
-  - **Passer un souhait en bibliothèque** : quand vous achetez ou recevez un livre de la liste de souhaits, un bouton **« ✓ Marquer comme acquis »** directement sur sa fiche (dans la vue grille) ou dans sa fiche détaillée le fait basculer instantanément dans votre bibliothèque, sans rien ressaisir — titre, auteur, couverture, genre restent tels quels.
-  - **Vérifier l'occasion (Gibert, Chasse aux livres)** : dans la fiche détaillée d'un livre de la liste de souhaits, deux liens 🔍 ouvrent une recherche Google ciblée sur gibert.com et chasse-aux-livres.fr pour ce livre précis. Chasse aux livres étant lui-même un comparateur de prix qui interroge notamment Momox et RecycLivre entre autres revendeurs, un lien dédié à chacun de ceux-ci serait redondant. Aucun de ces deux sites n'a d'API publique pour interroger prix et disponibilité automatiquement (Gibert n'a pas d'API du tout ; Chasse aux livres bloque explicitement les robots d'indexation IA dans son `robots.txt`) — plutôt que de scraper leurs pages (fragile, contraire à leurs conditions d'utilisation, comme déjà écarté pour Amazon et la Fnac), l'application ouvre directement les résultats de recherche pertinents dans un nouvel onglet, à vérifier manuellement. La recherche se fait par ISBN quand il est renseigné (une recherche par titre peut remonter n'importe quelle édition, alors que l'ISBN cible précisément celle que vous avez en fiche) ; sans ISBN, elle retombe sur titre + auteur.
-  - Le nouveau livre ajouté dépend de la vue active au moment de l'ajout : cliquez sur 🎁 avant d'ajouter pour l'envoyer dans la liste de souhaits, ou sur 📚 pour l'ajouter directement à votre bibliothèque.
-- **Revendus** : quand vous revendez un livre, le bouton **« 📚→📦 Marquer comme revendu »** dans sa fiche détaillée le retire de votre bibliothèque (et des statistiques de collection — total, répartition par genre) sans le supprimer. Il reste consultable dans l'onglet 📦 Revendus, aux côtés de 📚 Ma bibliothèque et 🎁 Liste de souhaits, et un bouton **« 📦→📚 Remettre dans la bibliothèque »** permet d'annuler à tout moment. Les statistiques de lecture par année (dans 📊 Statistiques) continuent de le compter : le fait d'avoir lu ce livre reste acquis même après l'avoir revendu.
-- **Éditeur** : champ dans la fiche du livre, rempli automatiquement lors de la recherche ISBN quand l'information est disponible (Open Library, Google Books ou BnF). Un filtre dédié dans la barre d'outils liste tous les éditeurs présents dans la bibliothèque.
-- **Série** : deux champs libres dans la fiche du livre — le nom de la série et le numéro du tome (au format texte, pour couvrir aussi les hors-séries ou demi-tomes comme « 3.5 »). Aucune des sources de recherche ISBN ne fournit cette information de façon fiable, donc ces champs se remplissent manuellement. Quand renseigné, le nom de la série s'affiche sur la carte du livre (vue grille), avec le numéro entre parenthèses.
-- **Appartient à** : champ pour indiquer à qui appartient le livre (utile pour une bibliothèque partagée entre plusieurs personnes d'un même foyer — peut contenir plusieurs noms séparés par des virgules pour un livre en copropriété). S'affiche en tag 📚 sur la carte (vue grille) et dispose de son propre filtre. C'est un champ distinct de « Prêté à », qui sert lui à noter un prêt temporaire à quelqu'un d'extérieur.
-- **Types de livre** : Roman, BD, Manga, Essai, Autre — disponibles partout où le type est choisi (fiche, import CSV, import ISBN en masse, filtre).
-- **Scanner de code-barres** : dans la fiche d'ajout d'un livre, le bouton 📷 à côté du champ ISBN ouvre la caméra du téléphone pour scanner directement le code-barres (EAN-13) au dos du livre. L'ISBN détecté est rempli automatiquement et la recherche se lance toute seule.
+- **Locally cached covers**: as soon as a book is added or edited with a cover (automatic ISBN search, or a manually pasted URL), the app downloads the image once, resizes it to a maximum width of 500px, compresses it to JPEG (82% quality), and stores it in `data/covers/` on the NAS. It's then served locally (`/covers/{id}.jpg`) without ever depending on external sites (Open Library, Amazon, etc.) day-to-day — faster to load, and safe if one of the sources disappears someday. If the download fails at save time, the original external URL is kept as-is as a fallback.
+  - **Optimize existing covers**: the 🖼️ button at the top of the screen goes through all books already in the database whose cover still points to an external source (books added before this feature, or whose caching failed at the time) and caches them locally. No effect on already-optimized books — you can run it as many times as needed without risk.
+  - **Watch out for large libraries**: this operation processes books one at a time (download + resize), which can take several minutes for a library of several hundred books and exceed a browser's or reverse proxy's timeout. Safe if that happens: already-processed covers stay cached, just click the button again to resume where it left off (already-optimized books are automatically skipped).
+  - If no automatic source finds a cover (common for comics, since the BnF doesn't provide images), the "Cover URL" field on the book's record lets you paste one manually (from the publisher's site, a retailer, etc.) — it will be cached locally the same way.
+- **Grid / list view**: two buttons at the top right of the toolbar let you switch between grid display (default) and a more compact list view. The choice is remembered in the browser.
+- **Sticky header on scroll**: on desktop (screens wider than 640px), the top banner and toolbar stay visible at all times while scrolling through books, keeping search/filters within reach. On mobile, this behavior is disabled so as not to eat into the already-limited vertical space.
+- **Dark theme**: the app uses a dark theme by default, with a midnight-blue banner under the "Ma Bibliothèque" title.
+- **Read date**: checking "Read" on a book's record reveals a date field (pre-filled with today's date, editable). It's then shown on the card, next to the checkmark.
+- **Genre filter**: a dropdown in the toolbar lists every genre used in the library (multiple genres separated by commas on the same record are correctly counted separately) and filters the display accordingly.
+- **Rating filter**: a dropdown ("18/20 and above", "16/20 and above", etc.) shows only books rated at least that high. Books without a rating (unread, or read but not yet rated) are excluded as soon as a threshold is selected.
+- **Per-owner statistics**: the 📊 Statistics button opens a view with one card per person (those entered in the "Belongs to" field), showing the number of books owned, the breakdown by genre, and reads by year. A book shared between several people (e.g. "Dad, Son") counts for each of them separately. Books with no owner set are grouped under "No owner" rather than being ignored. A sold book (see below) drops out of the total and genre breakdown, but still counts in reads by year: having read it stays true even after selling it.
+- **Wishlist**: the 🎁 button at the top of the screen switches to a separate view of books you'd like to acquire (ISBN search, cover, genres... everything works the same as for the library). The views never mix: statistics, filters, and the book count only cover books actually owned, with a separate "wished for" counter.
+  - **Turning a wish into a library book**: when you buy or receive a book from the wishlist, a **"✓ Mark as acquired"** button directly on its card (grid view) or in its detail view instantly moves it into your library, without re-entering anything — title, author, cover, genre stay as they are.
+  - **Check secondhand availability (Gibert, Chasse aux livres)**: on a wishlist book's detail view, two 🔍 links open a Google search targeted at gibert.com and chasse-aux-livres.fr for that specific book. Since Chasse aux livres is itself a price comparison site that queries Momox and RecycLivre among other resellers, a dedicated link for each of those would be redundant. Neither site has a public API to query price and availability automatically (Gibert has no API at all; Chasse aux livres explicitly blocks AI crawlers in its `robots.txt`) — rather than scraping their pages (fragile, against their terms of service, as already ruled out for Amazon and Fnac), the app opens the relevant search results directly in a new tab, to check manually. The search uses the ISBN when available (a title search can surface any edition, whereas the ISBN targets precisely the one on your record); without an ISBN, it falls back to title + author.
+  - The newly added book depends on the active view at the time of adding: click 🎁 before adding to send it to the wishlist, or 📚 to add it directly to your library.
+- **Sold books**: when you sell a book, the **"📚→📦 Mark as sold"** button on its detail view removes it from your library (and from collection statistics — total, genre breakdown) without deleting it. It remains viewable under the 📦 Sold tab, alongside 📚 My Library and 🎁 Wishlist, and a **"📦→📚 Put back in library"** button lets you undo this at any time. Reads-by-year statistics (under 📊 Statistics) keep counting it: having read the book stays true even after selling it.
+- **Publisher**: a field on the book's record, filled in automatically during ISBN search when the information is available (Open Library, Google Books, or BnF). A dedicated filter in the toolbar lists every publisher present in the library.
+- **Series**: two free-text fields on the book's record — the series name and the volume number (stored as text, to also cover special or half volumes like "3.5"). None of the ISBN search sources reliably provide this information, so these fields are filled in manually. When set, the series name is shown on the book's card (grid view), with the number in parentheses.
+- **Belongs to**: a field indicating who owns the book (useful for a library shared between several people in the same household — can contain several names separated by commas for a jointly-owned book). Shown as a 📚 tag on the card (grid view) and has its own filter. This is a separate field from "Lent to", which is used to track a temporary loan to someone outside the household.
+- **Book types**: Novel, Comic, Manga, Essay, Other — available everywhere a type is chosen (record, CSV import, bulk ISBN import, filter).
+- **Barcode scanner**: on the add-book form, the 📷 button next to the ISBN field opens the phone's camera to scan the barcode (EAN-13) on the back of the book directly. The detected ISBN is filled in automatically and the search starts on its own.
 
-  **⚠️ Nécessite HTTPS.** Les navigateurs interdisent l'accès à la caméra sur les pages chargées en `http://` simple, pour des raisons de sécurité — ce qui est le cas par défaut de votre NAS (`http://IP_DU_NAS:7000`). Pour que le bouton scanner fonctionne, il faut activer un accès HTTPS, par exemple via le **Reverse Proxy** intégré au DSM :
-  1. Panneau de configuration → Portail des applications → Reverse Proxy → Créer.
-  2. Source : HTTPS, le port de votre choix (443 ou autre).
-  3. Destination : HTTP, `localhost`, port **7000** (le port publié sur l'hôte défini dans `docker-compose.yml`, PAS le port interne 3000 du conteneur — le proxy inverse de DSM tourne au niveau du système, en dehors du réseau Docker, il ne peut donc joindre l'appli que via le port réellement exposé sur le NAS).
-  4. Il vous faut un certificat SSL valide sur ce nom d'hôte — Panneau de configuration → Sécurité → Certificat, avec Let's Encrypt si votre NAS est accessible depuis Internet, ou un certificat auto-signé accepté manuellement dans le navigateur sinon (moins pratique sur mobile).
-  5. Accédez ensuite à l'application via `https://votre-nom-dhote` au lieu de `http://IP:7000`.
+  **⚠️ Requires HTTPS.** Browsers forbid camera access on pages loaded over plain `http://`, for security reasons — which is your NAS's default (`http://NAS_IP:7000`). For the scanner button to work, you need to enable HTTPS access, for example via DSM's built-in **Reverse Proxy**:
+  1. Control Panel → Login Portal → Reverse Proxy → Create.
+  2. Source: HTTPS, the port of your choice (443 or other).
+  3. Destination: HTTP, `localhost`, port **7000** (the port published on the host as defined in `docker-compose.yml`, NOT the container's internal port 3000 — DSM's reverse proxy runs at the system level, outside the Docker network, so it can only reach the app through the port actually exposed on the NAS).
+  4. You need a valid SSL certificate on this hostname — Control Panel → Security → Certificate, with Let's Encrypt if your NAS is reachable from the internet, or a self-signed certificate accepted manually in the browser otherwise (less convenient on mobile).
+  5. Then access the app via `https://your-hostname` instead of `http://IP:7000`.
 
-  Sans HTTPS, le reste de l'application fonctionne normalement — seul le bouton scanner affichera un message expliquant qu'il faut l'HTTPS, et vous pourrez toujours saisir l'ISBN à la main.
+  Without HTTPS, the rest of the app works normally — only the scanner button will show a message explaining that HTTPS is required, and you can always type the ISBN by hand.
 
-## Notes sur la recherche ISBN
-- Fonctionne avec les ISBN-10 et ISBN-13, avec ou sans tirets.
-- Les deux sources (Open Library et Google Books) sont interrogées en parallèle et fusionnées : si l'une manque l'auteur ou la couverture, l'autre vient compléter automatiquement. Une troisième requête interroge directement la fiche technique Open Library (utile pour les vieilles éditions ou les BD mal cataloguées où l'auteur n'est pas toujours lié). Une quatrième source interroge le catalogue de la **BnF** (Bibliothèque nationale de France), qui référence quasiment tout ce qui est publié en France via le dépôt légal — bien plus fiable qu'Open Library/Google Books pour les livres et BD francophones (elle ne fournit pas de couverture, seulement titre/auteur/genre).
-- Une cinquième source récupère la couverture via le **widget image officiel d'Amazon** (pas de scraping HTML — Amazon utilise l'ISBN-10 comme identifiant produit "ASIN" et expose un widget d'image prévu pour l'intégration, sans compte ni clé nécessaire pour cet usage). C'est un complément de dernier recours, uniquement pour l'image (jamais pour le titre/auteur), utilisé seulement si aucune des autres sources n'a de couverture.
-  **Si Amazon change son site et que cette source arrête de fonctionner :** ouvrez `server.js`, cherchez le bloc commenté `SOURCE COUVERTURE : AMAZON` (juste avant la fonction `lookupOpenLibraryEdition`). Une seule constante à modifier : `AMAZON_COVER_URL_TEMPLATE`. Pour trouver le nouveau format d'URL, ouvrez la fiche d'un livre sur amazon.fr dans un navigateur, faites un clic droit sur l'image de couverture → « Copier l'adresse de l'image », et adaptez le modèle en remplaçant l'ISBN-10 du livre par `{ASIN}` dans l'URL copiée. Le reste du code (fonction `lookupAmazonCover`) n'a normalement pas besoin d'être touché.
-- Une sixième source (**Geobib**, `couverture.geobib.fr`) récupère la couverture directement depuis les collections numérisées de la BnF à partir de l'ISBN — complémentaire à la BnF elle-même, qui ne fournit que du texte. **Attention à sa fiabilité** : contrairement aux autres sources, ce n'est pas un service officiel adossé à une grosse structure, mais un projet personnel d'un bibliothécaire hébergé sur un petit serveur. Il peut ralentir, devenir indisponible, ou disparaître un jour sans préavis. Le code échoue silencieusement dans ce cas, comme pour les autres sources, sans bloquer la recherche. S'il disparaissait, il n'y a rien à réparer : supprimez simplement le bloc `SOURCE COUVERTURE : GEOBIB` dans `server.js` (fonction `lookupGeobibCover`) et la boucle qui l'appelle dans `lookupIsbn`.
-- Si aucune des sources n'a de couverture, le champ reste vide plutôt que d'afficher l'image "couverture introuvable" générique d'Open Library.
-- **Limite honnête** : pour les livres de petits éditeurs ou de niche (faible tirage, distribution confidentielle), il arrive qu'aucune des 5 sources ne connaisse tout simplement le livre — ni titre, ni auteur, ni couverture. Ce n'est pas un bug de l'application : l'information n'existe nulle part dans ces bases publiques et gratuites. Dans ce cas, seule la saisie manuelle (avec, si besoin, une URL de couverture trouvée sur le site de l'éditeur ou un revendeur) permet de compléter la fiche.
-- Si malgré tout l'auteur ou la couverture restent introuvables pour un livre précis, c'est que l'information n'existe tout simplement pas dans ces bases publiques pour cette édition (fréquent pour les éditions françaises anciennes ou les petits éditeurs) — il faut alors les compléter manuellement.
-- Si aucun des deux services (Open Library / Google Books) ne trouve le livre, un message l'indique et vous pouvez toujours remplir la fiche manuellement.
-- Aucune clé API n'est nécessaire.
+## Notes on ISBN search
+- Works with both ISBN-10 and ISBN-13, with or without dashes.
+- The two main sources (Open Library and Google Books) are queried in parallel and merged: if one is missing the author or cover, the other fills it in automatically. A third request queries Open Library's raw edition record directly (useful for old editions or poorly cataloged comics where the author isn't always linked). A fourth source queries the **BnF** (Bibliothèque nationale de France) catalog, which references almost everything published in France through legal deposit — far more reliable than Open Library/Google Books for French-language books and comics (it doesn't provide a cover, only title/author/genre).
+- A fifth source fetches the cover via **Amazon's official image widget** (no HTML scraping — Amazon uses the ISBN-10 as its product identifier, the "ASIN", and exposes an image widget meant for embedding, no account or key needed for this basic use). This is a last-resort complement, only for the image (never for title/author), used only if none of the other sources has a cover.
+  **If Amazon changes its site and this source stops working:** open `server.js`, find the commented block `SOURCE COUVERTURE : AMAZON` (right before the `lookupOpenLibraryEdition` function). Only one constant needs changing: `AMAZON_COVER_URL_TEMPLATE`. To find the new URL format, open a book's page on amazon.fr in a browser, right-click the cover image → "Copy image address", and adapt the template by replacing the book's ISBN-10 with `{ASIN}` in the copied URL. The rest of the code (the `lookupAmazonCover` function) shouldn't normally need to be touched.
+- A sixth source (**Geobib**, `couverture.geobib.fr`) fetches the cover directly from the BnF's digitized collections based on the ISBN — complementary to the BnF source itself, which only provides text. **Mind its reliability**: unlike the other sources, this isn't an official service backed by a large organization, but a librarian's personal project hosted on a small server. It may slow down, become unavailable, or disappear one day without notice. The code fails silently in that case, just like the other sources, without blocking the search. If it disappears, there's nothing to fix: just remove the `SOURCE COUVERTURE : GEOBIB` block in `server.js` (the `lookupGeobibCover` function) and the loop that calls it in `lookupIsbn`.
+- If none of the sources has a cover, the field stays empty rather than showing Open Library's generic "cover not found" image.
+- **Honest limitation**: for books from small or niche publishers (low print runs, limited distribution), it can happen that none of the 5 sources knows the book at all — no title, author, or cover. This isn't a bug: the information simply doesn't exist in these free, public databases. In that case, only manual entry (with, if needed, a cover URL found on the publisher's site or a retailer) can complete the record.
+- If the author or cover still can't be found for a specific book despite all this, it's simply because the information doesn't exist in these public databases for that edition (common for old French editions or small publishers) — you'll need to fill them in manually.
+- If neither service (Open Library / Google Books) finds the book, a message says so and you can always fill in the record manually.
+- No API key is needed.
 
-## Dépannage sharp (si le build échoue)
+## Troubleshooting sharp (if the build fails)
 
-La bibliothèque `sharp`, utilisée pour redimensionner et compresser les couvertures avant de les stocker localement, télécharge automatiquement un binaire précompilé adapté à l'architecture de votre NAS pendant `npm install` (au moment du build Docker). Ça fonctionne sans intervention sur l'immense majorité des NAS Synology (Intel/AMD comme ARM64).
+The `sharp` library, used to resize and compress covers before storing them locally, automatically downloads a precompiled binary matching your NAS's architecture during `npm install` (at Docker build time). This works without any intervention on the vast majority of Synology NAS models (Intel/AMD as well as ARM64).
 
-Si le build Docker échoue avec une erreur mentionnant `sharp` (rare, en général uniquement sur un très ancien modèle 32 bits) :
-1. Vérifiez le modèle de votre NAS et son processeur (Panneau de configuration → Info système, ou la fiche produit Synology).
-2. Si c'est bien un cas d'architecture non supportée par le binaire précompilé, une alternative consiste à retirer `sharp` du projet et désactiver la mise en cache locale des couvertures — l'application continuera de fonctionner normalement en affichant les images directement depuis les sources externes (comme avant l'ajout de cette fonctionnalité). Dans ce cas, contactez-moi avec le message d'erreur exact du build pour que je vous prépare cette version simplifiée.
+If the Docker build fails with an error mentioning `sharp` (rare, generally only on a very old 32-bit model):
+1. Check your NAS model and its processor (Control Panel → Info Center, or the Synology product page).
+2. If it is indeed a case of an architecture unsupported by the precompiled binary, an alternative is to remove `sharp` from the project and disable local cover caching — the app will keep working normally, displaying images directly from external sources (as it did before this feature was added). In that case, contact me with the exact build error message so I can prepare this simplified version for you.
