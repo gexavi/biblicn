@@ -75,6 +75,7 @@ En plus de `AUTH_USERNAME`/`AUTH_PASSWORD`, quelques variables d'environnement o
 | `COVER_JPEG_QUALITY` | `82` | Qualité de compression JPEG des couvertures |
 | `BACKUP_INTERVAL_DAYS` | `15` | Fréquence de la sauvegarde automatique |
 | `BACKUP_KEEP` | `6` | Nombre de sauvegardes automatiques conservées |
+| `COOKIE_SECURE` | `false` | `auto` active l'attribut Secure du cookie de session dès qu'un Reverse Proxy HTTPS est détecté (`X-Forwarded-Proto`) ; `true` le force toujours |
 
 Ajoutez-les au fichier `.env` (ligne de commande) ou aux **Environment variables** de la stack (Portainer), comme pour `AUTH_USERNAME`/`AUTH_PASSWORD`.
 

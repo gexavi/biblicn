@@ -29,4 +29,11 @@ VOLUME ["/app/data"]
 EXPOSE 3100
 
 WORKDIR /app/mcp-server
+
+# Service en lecture seule sur le volume de données (monté :ro dans
+# docker-compose.yml) : pas besoin de chown au démarrage comme le service
+# principal, on peut passer directement en utilisateur non-privilégié.
+# "node" est l'utilisateur fourni par l'image de base (même uid/gid que dans
+# l'image du service principal, donc capable de lire les fichiers qu'il crée).
+USER node
 CMD ["node", "index.js"]

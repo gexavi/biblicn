@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   isbn10to13, isbn13to10, isbnVariants, xmlUnescape, extractAllXmlTags,
-  bnfAuthorToDisplayName, mergeIsbnResults, normalizeStatus, normalizeType
+  bnfAuthorToDisplayName, mergeIsbnResults, normalizeStatus, normalizeType, clampNote
 } = require('../lib/isbn-utils');
 
 // Paire ISBN-10/ISBN-13 de référence (exemple documenté sur Wikipedia,
@@ -150,4 +150,26 @@ test('normalizeType est insensible à la casse et aux espaces', () => {
 test('normalizeType retombe sur "roman" pour une valeur invalide ou absente', () => {
   assert.equal(normalizeType('inconnu'), 'roman');
   assert.equal(normalizeType(undefined), 'roman');
+});
+
+test('clampNote renvoie null pour une valeur absente ou vide', () => {
+  assert.equal(clampNote(null), null);
+  assert.equal(clampNote(undefined), null);
+  assert.equal(clampNote(''), null);
+});
+
+test('clampNote renvoie null pour une valeur non numérique', () => {
+  assert.equal(clampNote('abc'), null);
+});
+
+test('clampNote laisse passer une note déjà dans les bornes', () => {
+  assert.equal(clampNote(15), 15);
+  assert.equal(clampNote('15'), 15);
+  assert.equal(clampNote(0), 0);
+  assert.equal(clampNote(20), 20);
+});
+
+test('clampNote ramène une valeur hors bornes à 0 ou 20', () => {
+  assert.equal(clampNote(-5), 0);
+  assert.equal(clampNote(25), 20);
 });

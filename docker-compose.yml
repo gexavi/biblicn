@@ -18,6 +18,7 @@ services:
       - COVER_JPEG_QUALITY=${COVER_JPEG_QUALITY:-82}
       - BACKUP_INTERVAL_DAYS=${BACKUP_INTERVAL_DAYS:-15}
       - BACKUP_KEEP=${BACKUP_KEEP:-6}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
     volumes:
       # Chemin absolu obligatoire (Portainer gère mal les chemins relatifs
       # comme ./data) — adaptez si votre dossier NAS est différent.

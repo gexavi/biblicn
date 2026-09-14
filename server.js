@@ -9,7 +9,7 @@ const fetch = require('node-fetch');
 const sharp = require('sharp');
 const {
   isbn10to13, isbn13to10, isbnVariants, xmlUnescape, extractAllXmlTags,
-  bnfAuthorToDisplayName, mergeIsbnResults, normalizeStatus, normalizeType
+  bnfAuthorToDisplayName, mergeIsbnResults, normalizeStatus, normalizeType, clampNote
 } = require('./lib/isbn-utils');
 const { createLoginThrottle } = require('./lib/login-throttle');
 
@@ -43,6 +43,21 @@ if (!AUTH_USERNAME || !AUTH_PASSWORD) {
 }
 const SESSION_COOKIE = 'bibli_session';
 const SESSION_DURATION_MS = (Number(process.env.SESSION_DURATION_DAYS) || 30) * 24 * 60 * 60 * 1000;
+
+// Attribut Secure du cookie de session : à activer dès que l'app est servie
+// en HTTPS (reverse proxy DSM, voir README) pour empêcher le cookie de
+// transiter en clair si jamais elle redevient accessible en HTTP simple.
+// Pas d'activation automatique par défaut (l'app tourne en HTTP simple sur
+// le NAS tant qu'aucun reverse proxy n'est configuré, et un cookie Secure y
+// serait alors systématiquement rejeté par le navigateur) : COOKIE_SECURE=true
+// force l'attribut, COOKIE_SECURE=auto le déduit de l'en-tête
+// X-Forwarded-Proto envoyé par le reverse proxy.
+const COOKIE_SECURE_MODE = (process.env.COOKIE_SECURE || 'false').toLowerCase();
+function useSecureCookie(req) {
+  if (COOKIE_SECURE_MODE === 'true') return true;
+  if (COOKIE_SECURE_MODE === 'auto') return req.headers['x-forwarded-proto'] === 'https';
+  return false;
+}
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -216,14 +231,16 @@ app.post('/api/login', (req, res) => {
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
   db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)').run(token, expiresAt);
   const maxAge = remember ? `; Max-Age=${SESSION_DURATION_MS / 1000}` : '';
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax${maxAge}; Path=/`);
+  const secure = useSecureCookie(req) ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax${secure}${maxAge}; Path=/`);
   res.json({ ok: true });
 });
 
 app.post('/api/logout', (req, res) => {
   const { [SESSION_COOKIE]: token } = parseCookies(req);
   if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`);
+  const secure = useSecureCookie(req) ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax${secure}; Max-Age=0; Path=/`);
   res.json({ ok: true });
 });
 
@@ -550,7 +567,11 @@ async function localizeCover(bookId, remoteUrl) {
     return null;
   }
   try {
-    const res = await fetch(remoteUrl, { timeout: 12000 });
+    // redirect: 'error' plutôt que le suivi par défaut de node-fetch : une
+    // redirection HTTP vers une IP interne contournerait sinon complètement
+    // la vérification isSafeRemoteUrl ci-dessus (elle ne valide que l'URL
+    // d'origine, jamais la cible d'une redirection ultérieure).
+    const res = await fetch(remoteUrl, { timeout: 12000, redirect: 'error' });
     if (!res.ok) return null;
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.startsWith('image/')) return null;
@@ -625,7 +646,7 @@ function syncOwnerReads(bookId, ownerField, reads) {
   for (const r of reads) {
     const name = String(r.owner || '').trim();
     if (!name || !r.lu) continue;
-    const note = r.note != null && r.note !== '' ? Number(r.note) : null;
+    const note = clampNote(r.note);
     const read_date = r.read_date || null;
     insert.run(bookId, name, read_date, note);
     if (name === primaryOwner) primaryRead = { read_date };
@@ -713,7 +734,7 @@ app.post('/api/books', async (req, res) => {
     type: b.type || 'roman',
     genre: b.genre || '',
     lu: b.lu ? 1 : 0,
-    note: b.note != null && b.note !== '' ? Number(b.note) : null,
+    note: clampNote(b.note),
     location: b.location || '',
     lent_to: b.lent_to || '',
     cover_url: b.cover_url || null,
@@ -772,7 +793,7 @@ app.put('/api/books/:id', async (req, res) => {
     type: b.type || 'roman',
     genre: b.genre || '',
     lu: b.lu ? 1 : 0,
-    note: b.note != null && b.note !== '' ? Number(b.note) : null,
+    note: clampNote(b.note),
     location: b.location || '',
     lent_to: b.lent_to || '',
     cover_url: coverToStore,
@@ -926,7 +947,7 @@ app.post('/api/books/bulk', async (req, res) => {
         type: normalizeType(b.type),
         genre: b.genre || '',
         lu: (b.lu === true || b.lu === '1' || String(b.lu).toLowerCase() === 'oui' || String(b.lu).toLowerCase() === 'true') ? 1 : 0,
-        note: b.note !== undefined && b.note !== '' && b.note !== null ? Number(b.note) : null,
+        note: clampNote(b.note),
         location: b.location || '',
         lent_to: b.lent_to || '',
         cover_url: b.cover_url || null,

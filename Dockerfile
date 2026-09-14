@@ -4,8 +4,10 @@ WORKDIR /app
 
 # Applique les derniers correctifs de sécurité Alpine (libssl3, libcrypto3,
 # libexpat, tar...) au moment du build plutôt que de dépendre de la date de
-# publication de l'image de base node:24-alpine.
-RUN apk upgrade --no-cache
+# publication de l'image de base node:24-alpine. su-exec : permet de démarrer
+# le conteneur en root juste le temps de fixer les permissions de DATA_DIR
+# (voir docker-entrypoint.sh) avant d'abandonner les privilèges root.
+RUN apk upgrade --no-cache && apk add --no-cache su-exec
 
 COPY package.json ./
 # Pas de chaîne de compilation (python3/make/g++) : better-sqlite3 et sharp
@@ -24,6 +26,8 @@ RUN npm install --omit=dev \
 COPY server.js ./
 COPY lib ./lib
 COPY public ./public
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
 ENV DATA_DIR=/app/data
 ENV PORT=3000
@@ -31,4 +35,7 @@ ENV PORT=3000
 VOLUME ["/app/data"]
 EXPOSE 3000
 
+# Conteneur lancé en root (défaut), le temps que docker-entrypoint.sh cède la
+# place à l'utilisateur non-privilégié "node" — voir ce fichier.
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]
