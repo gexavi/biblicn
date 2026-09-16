@@ -1,6 +1,6 @@
 {
   "name": "bibliotheque-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Application de gestion de bibliothèque personnelle - recherche par ISBN, auto-hébergée",
   "main": "server.js",
   "scripts": {

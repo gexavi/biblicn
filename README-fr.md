@@ -25,7 +25,7 @@ Application auto-hébergée de gestion de bibliothèque personnelle : recherche 
    volumes:
      - /volume1/docker/bibliotheque-app/data:/app/data
    ```
-6. Cliquez sur **Suivant** puis **Terminé**. La construction de l'image prend une à deux minutes la première fois.
+6. Cliquez sur **Suivant** puis **Terminé**. Le conteneur télécharge l'image déjà construite (voir [Mise à jour](#mise-à-jour) ci-dessous) — quelques dizaines de secondes la première fois, pas de compilation sur le NAS.
 7. Une fois le conteneur démarré, l'application est accessible sur `http://IP_DE_VOTRE_NAS:7000`.
 
 ### Option B — en ligne de commande (SSH)
@@ -35,8 +35,10 @@ Application auto-hébergée de gestion de bibliothèque personnelle : recherche 
 cd /volume1/docker
 mkdir -p bibliotheque-app && cd bibliotheque-app
 # copiez-y les fichiers du projet (scp, git, ou File Station), puis :
-sudo docker compose up -d --build
+sudo docker compose up -d
 ```
+
+Ceci télécharge l'image publiée sur GHCR plutôt que de la reconstruire localement. Pour construire depuis les sources à la place (ex. modification locale du code), utilisez `sudo docker compose up -d --build`.
 
 ### Accès mobile et web
 
@@ -49,6 +51,20 @@ Pour un accès distant sécurisé, le plus simple est de passer par le **Reverse
 L'application est installable comme une vraie app, avec sa propre icône et sans barre d'adresse de navigateur. Une fois connecté depuis un navigateur mobile, utilisez le menu du navigateur → **Ajouter à l'écran d'accueil** (Android/Chrome) ou **Partager → Sur l'écran d'accueil** (iPhone/Safari).
 
 **Nécessite HTTPS**, comme le scanner de code-barres (voir la section dédiée plus bas) — les navigateurs n'autorisent l'installation d'une PWA que sur une connexion sécurisée. Sans HTTPS, l'application reste utilisable normalement, seule l'option d'installation n'apparaît pas.
+
+## Mise à jour
+
+Chaque release (tag `vX.Y.Z`) déclenche une [Action GitHub](.github/workflows/release.yml) qui construit et publie les images `bibliotheque` et `bibliotheque-mcp` sur GHCR (multi-architecture : Intel/AMD et ARM), puis crée la release GitHub correspondante avec son changelog.
+
+Pour mettre à jour vers la dernière version :
+
+```bash
+cd /volume1/docker/bibliotheque-app
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+Pour figer une version précise (et pouvoir revenir en arrière si une mise à jour pose problème), définissez `BIBLIOTHEQUE_VERSION=vX.Y.Z` dans le fichier `.env` à côté de `docker-compose.yml` (voir `.env.example`), puis relancez les deux commandes ci-dessus. Les versions disponibles sont listées sur la page [Packages du dépôt](https://github.com/gexavi/biblicn/pkgs/container/biblicn).
 
 ## Connexion
 

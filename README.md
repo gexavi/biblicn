@@ -25,7 +25,7 @@ Self-hosted personal library management app: search books by ISBN, records with 
    volumes:
      - /volume1/docker/bibliotheque-app/data:/app/data
    ```
-6. Click **Next** then **Done**. Building the image takes one to two minutes the first time.
+6. Click **Next** then **Done**. The container pulls the already-built image (see [Updating](#updating) below) — a few tens of seconds the first time, no compiling on the NAS.
 7. Once the container has started, the app is accessible at `http://YOUR_NAS_IP:7000`.
 
 ### Option B — command line (SSH)
@@ -35,8 +35,10 @@ Self-hosted personal library management app: search books by ISBN, records with 
 cd /volume1/docker
 mkdir -p bibliotheque-app && cd bibliotheque-app
 # copy the project files here (scp, git, or File Station), then:
-sudo docker compose up -d --build
+sudo docker compose up -d
 ```
+
+This pulls the image published on GHCR instead of building it locally. To build from source instead (e.g. local code changes), use `sudo docker compose up -d --build`.
 
 ### Mobile and web access
 
@@ -49,6 +51,20 @@ For secure remote access, the easiest way is to go through DSM's built-in **Reve
 The app can be installed like a real app, with its own icon and no browser address bar. Once logged in from a mobile browser, use the browser menu → **Add to Home Screen** (Android/Chrome) or **Share → Add to Home Screen** (iPhone/Safari).
 
 **Requires HTTPS**, like the barcode scanner (see the dedicated section below) — browsers only allow installing a PWA over a secure connection. Without HTTPS, the rest of the app works normally; only the install option won't appear.
+
+## Updating
+
+Each release (tag `vX.Y.Z`) triggers a [GitHub Action](.github/workflows/release.yml) that builds and publishes the `bibliotheque` and `bibliotheque-mcp` images to GHCR (multi-architecture: Intel/AMD and ARM), then creates the corresponding GitHub Release with its changelog.
+
+To update to the latest version:
+
+```bash
+cd /volume1/docker/bibliotheque-app
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+To pin a specific version (and be able to roll back if an update causes issues), set `BIBLIOTHEQUE_VERSION=vX.Y.Z` in the `.env` file next to `docker-compose.yml` (see `.env.example`), then rerun the two commands above. Available versions are listed on the repo's [Packages page](https://github.com/gexavi/biblicn/pkgs/container/biblicn).
 
 ## Login
 
