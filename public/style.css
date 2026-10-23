@@ -784,6 +784,10 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 #clearFiltersBtn.active { border-color: var(--brass); color: var(--brass); }
 #clearFiltersBtn.active:hover { background: var(--brass); color: #241B04; }
 
+/* Icône seule, en rouge pour signaler l'action de sortie. */
+#logoutBtn { color: var(--burgundy); }
+#logoutBtn:hover { border-color: var(--burgundy); color: var(--burgundy); }
+
 /* ---------- Modale de confirmation ---------- */
 #confirmBackdrop { z-index: 60; align-items: center; }
 .modal-small { max-width: 380px; }
