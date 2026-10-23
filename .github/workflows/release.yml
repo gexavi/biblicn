@@ -4,16 +4,44 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Reconstruit chaque semaine les images du dernier tag pour embarquer les
+  # correctifs de sécurité Alpine/Node publiés depuis la release (apk upgrade
+  # dans les Dockerfiles), sans attendre une nouvelle version de l'appli.
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: write
   packages: write
 
 jobs:
+  # Tag à construire : celui qui a déclenché le workflow, ou à défaut (cron,
+  # lancement manuel) le tag de version le plus récent.
+  ref:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: tag
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+          else
+            tag=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: ref
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.ref.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -21,7 +49,7 @@ jobs:
       - run: npm test
 
   docker:
-    needs: test
+    needs: [ref, test]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,6 +60,8 @@ jobs:
             dockerfile: mcp-server/Dockerfile
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.ref.outputs.tag }}
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -47,7 +77,7 @@ jobs:
         with:
           images: ${{ matrix.image }}
           tags: |
-            type=raw,value=${{ github.ref_name }}
+            type=raw,value=${{ needs.ref.outputs.tag }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -60,6 +90,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   release:
+    # Release GitHub uniquement sur un vrai push de tag, pas sur les
+    # reconstructions périodiques.
+    if: github.ref_type == 'tag'
     needs: docker
     runs-on: ubuntu-latest
     steps:
