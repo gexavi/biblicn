@@ -784,8 +784,10 @@ main { padding: 0 clamp(16px, 4vw, 40px) 60px; }
 #clearFiltersBtn.active { border-color: var(--brass); color: var(--brass); }
 #clearFiltersBtn.active:hover { background: var(--brass); color: #241B04; }
 
-/* Icône seule, en rouge pour signaler l'action de sortie. */
-#logoutBtn { color: var(--burgundy); }
+/* Icône seule, en rouge pour signaler l'action de sortie. SVG plutôt que le
+   caractère ⏻ (U+23FB), absent des polices système Android (carré vide). */
+#logoutBtn { color: var(--burgundy); display: inline-flex; align-items: center; }
+.logout-icon { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 #logoutBtn:hover { border-color: var(--burgundy); color: var(--burgundy); }
 
 /* ---------- Modale de confirmation ---------- */
